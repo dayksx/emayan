@@ -50,3 +50,53 @@ export function buildGrievanceMemoText({ filer, to, amountXrp, grievanceBody }) 
 
   return truncateUtf8Bytes(line, MAX_MEMO_UTF8_BYTES);
 }
+
+const XRPL_CLASSIC_RE = "r[1-9A-HJ-NP-Za-km-z]{25,34}";
+const TX_HASH_RE = "[A-Fa-f0-9]{64}";
+
+/**
+ * Parse a Petty Ledger grievance memo line (same shape as buildGrievanceMemoText).
+ * @returns {{ cause: string, amountXrp: string, from: string, to: string } | null}
+ */
+export function parsePettyLedgerGrievanceMemo(text) {
+  if (!text || typeof text !== "string") return null;
+  const s = text.trim();
+  const causePrefix = "Petty Ledger - Cause: ";
+  const amountSep = " - Amount: ";
+  if (!s.startsWith(causePrefix)) return null;
+  const amountIdx = s.indexOf(amountSep, causePrefix.length);
+  if (amountIdx === -1) return null;
+  const cause = s.slice(causePrefix.length, amountIdx);
+  const tail = s.slice(amountIdx + amountSep.length);
+  const re = new RegExp(
+    `^([\\d.]+) XRP - From: (${XRPL_CLASSIC_RE}) - To: (${XRPL_CLASSIC_RE})$`
+  );
+  const m = re.exec(tail);
+  if (!m) return null;
+  return { cause, amountXrp: m[1], from: m[2], to: m[3] };
+}
+
+/**
+ * Memo for a 1-drop follow-up tx signed by the filer to mark a grievance resolved on-chain.
+ */
+export function buildGrievanceResolutionMemoText({ originalTxHash, filer, originalRecipient }) {
+  const line = `Petty Ledger - RESOLVED - Cancels tx: ${originalTxHash} - Filer: ${filer} - Original to: ${originalRecipient}`;
+  return truncateUtf8Bytes(line, MAX_MEMO_UTF8_BYTES);
+}
+
+/**
+ * @returns {{ canceledTxHash: string, filer: string, originalTo: string } | null}
+ */
+export function parsePettyLedgerResolutionMemo(text) {
+  if (!text || typeof text !== "string") return null;
+  const s = text.trim();
+  const prefix = "Petty Ledger - RESOLVED - Cancels tx: ";
+  if (!s.startsWith(prefix)) return null;
+  const rest = s.slice(prefix.length);
+  const re = new RegExp(
+    `^(${TX_HASH_RE}) - Filer: (${XRPL_CLASSIC_RE}) - Original to: (${XRPL_CLASSIC_RE})$`
+  );
+  const m = re.exec(rest);
+  if (!m) return null;
+  return { canceledTxHash: m[1], filer: m[2], originalTo: m[3] };
+}
