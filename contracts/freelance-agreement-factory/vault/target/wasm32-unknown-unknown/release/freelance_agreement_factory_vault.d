@@ -1,1 +1,0 @@
-/home/dayan/Workspace/hackathon/emayan/contracts/freelance-agreement-factory/vault/target/wasm32-unknown-unknown/release/freelance_agreement_factory_vault.wasm: /home/dayan/Workspace/hackathon/emayan/contracts/freelance-agreement-factory/vault/src/lib.rs

@@ -13,7 +13,7 @@
 | | |
 |:---|:---|
 | 📝 | **File** a grievance — text on-chain, no “I never said that” |
-| 💸 | **Stake** XRP in our **smart vault** — hold, release, or forfeit with clear rules |
+| 💸 | **Stake** XRP in **`petty_ledger`** (XRPL smart vault) — hold, release, or forfeit with clear rules |
 | 🎯 | **Name** a subject — their wallet is the one that can authorize certain payouts |
 | 🎭 | **Pick** a cause — symbolic justice, maximum spite, minimum ambiguity |
 | 📱 | **Flex** cards & Telegram off-chain — the chain handles truth; we handle drama |
@@ -28,14 +28,14 @@
 
 **Emayan** is our hackathon project: a **grievance ledger on the XRP Ledger** — public, verifiable complaints, optionally paired with symbolic XRP “donations” to causes the other party would dislike, plus human-readable **cards** and **Telegram** around those on-chain facts.
 
-In **this repository**, **Petty Ledger** is not just a brand: it is the **smart contract vault** in [`contracts/freelance-agreement-factory/vault/`](contracts/freelance-agreement-factory/vault/) (Rust → WASM for XRPL Bedrock). That vault is the on-chain authority for **recording** grievance envelopes in memos, **holding** XRP when custody matters, and **authorizing withdrawals** to filer, subject, or donation addresses. The UI and bots orchestrate wallets and messaging; the vault defines the rules for stake tied to a grievance. See [`contracts/freelance-agreement-factory/README.md`](contracts/freelance-agreement-factory/README.md) for memo formats and build/deploy notes.
+In **this repository**, **Petty Ledger** is not just a brand: it is the **`petty_ledger`** smart contract in [`contracts/petty-ledger/`](contracts/petty-ledger/) (`src/lib.rs`; Rust → WASM for XRPL Bedrock; deployed as the ledger’s **vault** primitive). That contract is the on-chain authority for **recording** grievance envelopes in memos, **holding** XRP when custody matters, and **authorizing withdrawals** to filer, subject, or donation addresses. The UI and bots orchestrate wallets and messaging; **`petty_ledger`** defines the rules for stake tied to a grievance. See [`contracts/petty-ledger/README.md`](contracts/petty-ledger/README.md) for memo formats and build/deploy notes.
 
 ### Project structure
 
 | Path | Role |
 |------|------|
 | [`ui/my-app/`](ui/my-app/) | Next.js frontend: grievance filing UX, XRPL wallet connection, direct WebSocket usage via `xrpl.js` / client tooling, components (`GrievanceForm`, `SentTransactionsPanel`, `Header`, etc.), optional API routes under `app/api/`. |
-| [`contracts/freelance-agreement-factory/`](contracts/freelance-agreement-factory/) | Bedrock project: **Petty Ledger vault** (`vault/src/lib.rs`), `bedrock.toml`, networks (e.g. testnet). This is the smart vault referenced throughout the product spec below. |
+| [`contracts/petty-ledger/`](contracts/petty-ledger/) | Bedrock project: **`petty_ledger`** (`src/lib.rs`), `bedrock.toml`, networks (e.g. testnet). Same smart vault primitive as XRPL/Bedrock “vault.” |
 
 ---
 
@@ -745,7 +745,7 @@ Total demo: under 2 minutes. Leaves 3 for story and business case.
 ## Notes
 
 - All transactions on XRPL L1 as required by hackathon rules
-- **Petty Ledger (on-chain)** is the **smart contract vault** in [`contracts/freelance-agreement-factory/vault/`](contracts/freelance-agreement-factory/vault/) — it records grievance-linked stake via structured memos, holds XRP, and authorizes withdrawals (filer, subject, or donation) per the rules in `lib.rs`. Product flows below may illustrate native `EscrowCreate` / `EscrowFinish` for narrative; wire actual custody to the vault where the build targets this repo. Details: [`contracts/freelance-agreement-factory/README.md`](contracts/freelance-agreement-factory/README.md).
+- **Petty Ledger (on-chain)** is the **`petty_ledger`** contract in [`contracts/petty-ledger/`](contracts/petty-ledger/) — it records grievance-linked stake via structured memos, holds XRP, and authorizes withdrawals (filer, subject, or donation) per the rules in `src/lib.rs`. Product flows below may illustrate native `EscrowCreate` / `EscrowFinish` for narrative; wire actual custody to **`petty_ledger`** where the build targets this repo. Details: [`contracts/petty-ledger/README.md`](contracts/petty-ledger/README.md).
 - Frontend connects directly to XRPL WebSocket — no REST proxy for chain access
 - Memo field is XRPL's native data layer — no custom protocol needed
 - Flat fee ~$0.0002 regardless of donation amount — mention in pitch

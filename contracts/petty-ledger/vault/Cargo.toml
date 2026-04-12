@@ -1,0 +1,12 @@
+# Bedrock `vault deploy` looks for Cargo.toml under `vault/`. Source stays at ../src/lib.rs.
+[package]
+name = "petty_ledger"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "../src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+xrpl-wasm-stdlib = { git = "https://github.com/willemolding/xrpl-wasm-stdlib.git", branch = "willem/smart-vaults", package = "xrpl-wasm-stdlib" }

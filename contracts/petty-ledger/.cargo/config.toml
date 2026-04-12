@@ -1,0 +1,3 @@
+# Bedrock `vault deploy` expects WASM under `vault/target/...`. Workspace default is `./target/`.
+[build]
+target-dir = "vault/target"
