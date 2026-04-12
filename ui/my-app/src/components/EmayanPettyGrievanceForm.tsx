@@ -181,7 +181,6 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
           body: JSON.stringify({
             chatIdOrUsername: tg,
             text: buildGrievanceTelegramText({
-              brandLine: "Emayan",
               filer: partyA,
               recipient: dest,
               cause: causeLabel,

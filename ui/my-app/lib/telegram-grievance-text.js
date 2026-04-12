@@ -1,9 +1,12 @@
 const TELEGRAM_MAX = 4096;
 
+/** Default first line label for grievance Telegram DMs. */
+export const PETTY_LEDGER_NOTIFICATION_TITLE = "Petty Ledger Notification 🙂";
+
 /**
  * Pretty plain-text body for Telegram (emojis + spacing). No parse_mode — safe for any user text.
  * @param {{
- *   brandLine: string;
+ *   brandLine?: string;
  *   filer: string;
  *   recipient: string;
  *   cause: string;
@@ -13,9 +16,10 @@ const TELEGRAM_MAX = 4096;
  * }} p
  */
 export function buildGrievanceTelegramText(p) {
+  const brandLine = p.brandLine ?? PETTY_LEDGER_NOTIFICATION_TITLE;
   const msg = p.grievanceBody.trim().slice(0, 1500);
   const lines = [
-    `✨ ${p.brandLine}`,
+    `✨ ${brandLine}`,
     `📋 New grievance`,
     `━━━━━━━━━━━━━━━━━━━━`,
     ``,
@@ -41,7 +45,6 @@ export function buildGrievanceTelegramText(p) {
     `🔗 Transaction`,
     `   ${p.txHash}`,
     ``,
-    `📎 Same text is in the on-chain payment memo.`,
   ];
 
   let text = lines.join("\n");

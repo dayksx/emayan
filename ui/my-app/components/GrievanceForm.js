@@ -112,7 +112,6 @@ export function GrievanceForm({ onSubmitted }) {
           body: JSON.stringify({
             chatIdOrUsername: tg,
             text: buildGrievanceTelegramText({
-              brandLine: "Petty Ledger",
               filer: partyA,
               recipient: dest,
               cause: causeLabel,
