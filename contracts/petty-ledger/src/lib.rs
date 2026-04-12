@@ -47,7 +47,11 @@ struct PettyState {
     amount_drops: u64,
 }
 
+/// Serialization for vault `Data`: **76 bytes** of meaningful layout (then zeros to `XRPL_CONTRACT_DATA_SIZE`).
+/// Offsets: `0..4` magic (`PETY`), `4` version, `5` status, `6..8` reserved, `8..28` filer, `28..48` subject,
+/// `48..68` donation, `68..76` staked amount (u64 little-endian).
 impl PettyState {
+    /// Default record: no open stake; magic/version unset; all account IDs and amount zeroed.
     fn empty() -> Self {
         Self {
             magic: [0; 4],
@@ -61,6 +65,7 @@ impl PettyState {
         }
     }
 
+    /// Deserialize on-ledger `Data`: if `len` is too small, return `empty()`; else copy each field (amount is LE u64).
     fn from_bytes(data: &[u8; XRPL_CONTRACT_DATA_SIZE], len: usize) -> Self {
         if len < 72 {
             return Self::empty();
@@ -78,6 +83,7 @@ impl PettyState {
         s
     }
 
+    /// Serialize into the full contract-data buffer: zero everything, then write fields in the same order as `from_bytes`.
     fn write_to(&self, out: &mut [u8; XRPL_CONTRACT_DATA_SIZE]) {
         *out = [0u8; XRPL_CONTRACT_DATA_SIZE];
         out[0..4].copy_from_slice(&self.magic);
@@ -217,6 +223,9 @@ fn memo_has_header(memo: &[u8]) -> bool {
     false
 }
 
+/// **Deposit path** (incoming `Payment` to the vault): load state → reject if already open → read filer & XRP amount →
+/// require memo with `PETTY_LEDGER_V1` plus `subject:` / `donation:` hex lines → enforce filer ≠ subject ≠ donation →
+/// persist `OPEN` state with staked drops.
 #[unsafe(no_mangle)]
 pub extern "C" fn on_deposit() -> i32 {
     let existing = read_contract_data();
@@ -291,6 +300,8 @@ pub extern "C" fn on_deposit() -> i32 {
     persist_state(&new_state)
 }
 
+/// **Withdraw path** (subject releases stake): load state → require `OPEN` + valid magic → signer must be **subject** →
+/// `Destination` must be filer (refund), subject (payout), or donation (forfeit) → clear to `EMPTY` and persist.
 #[unsafe(no_mangle)]
 pub extern "C" fn on_withdraw() -> i32 {
     let existing = read_contract_data();
