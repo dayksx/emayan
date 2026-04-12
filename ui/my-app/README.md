@@ -139,7 +139,7 @@ NEXT_PUBLIC_DEFAULT_NETWORK=alphanet
 
 ### AlphaNet (Default)
 - **WebSocket:** wss://alphanet.nerdnest.xyz
-- **Network ID:** 21465
+- **Network ID:** 21565 (confirm with Alphanet `server_info`; older docs listed 21465)
 - **Faucet:** https://alphanet.faucet.nerdnest.xyz/accounts
 - **Explorer:** https://alphanet.xrpl.org
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { convertStringToHex, isValidClassicAddress, xrpToDrops } from "xrpl";
 import { useWallet } from "../../components/providers/WalletProvider";
 import { CAUSES, buildGrievanceMemoText } from "../../lib/grievance-memo";
+import { buildGrievanceTelegramText } from "../../lib/telegram-grievance-text";
 import { txExplorerUrl } from "../../lib/xrpl-explorer";
 
 /** Visual-only options from the Petty Ledger mock UI (not written on-chain). */
@@ -41,6 +42,7 @@ type SubmitResult =
       hash: string;
       telegramStatus: string;
       telegramError: string | null;
+      telegramPartialFailures?: string | null;
     };
 
 export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
@@ -171,30 +173,57 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
 
       let telegramStatus: string = "skipped";
       let telegramError: string | null = null;
+      let telegramPartialFailures: string | null = null;
       try {
         const notifyRes = await fetch("/api/notify-telegram", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chatIdOrUsername: tg,
-            text:
-              `⚠️ Emayan grievance (XRPL testnet)\n\n` +
-              `From (filer): ${partyA}\n` +
-              `To (recipient / address you listed): ${dest}\n` +
-              `Cause: ${causeLabel}\n` +
-              `Amount in this payment: ${amountXrp} XRP\n\n` +
-              `Message:\n${grievance.trim().slice(0, 1500)}\n\n` +
-              `Tx: ${hash}`,
+            text: buildGrievanceTelegramText({
+              brandLine: "Emayan",
+              filer: partyA,
+              recipient: dest,
+              cause: causeLabel,
+              amountXrp,
+              grievanceBody: grievance,
+              txHash: hash,
+            }),
           }),
         });
-        const notifyJson = await notifyRes.json();
-        if (notifyJson.skipped && notifyJson.reason === "telegram_bot_token_not_set") {
-          telegramStatus = "not_configured";
-        } else if (notifyJson.ok) {
-          telegramStatus = "sent";
-        } else {
+        const rawBody = await notifyRes.text();
+        let notifyJson: Record<string, unknown> | null = null;
+        try {
+          notifyJson = rawBody ? (JSON.parse(rawBody) as Record<string, unknown>) : {};
+        } catch {
           telegramStatus = "failed";
-          telegramError = typeof notifyJson.error === "string" ? notifyJson.error : null;
+          telegramError = `notify returned invalid JSON (HTTP ${notifyRes.status})`;
+        }
+        if (telegramStatus !== "failed" && notifyJson) {
+          if (notifyJson.skipped && notifyJson.reason === "telegram_bot_token_not_set") {
+            telegramStatus = "not_configured";
+          } else if (notifyJson.ok) {
+            telegramStatus = "sent";
+            const partial = notifyJson.partial;
+            const failures = notifyJson.failures;
+            if (
+              partial &&
+              Array.isArray(failures) &&
+              failures.length > 0
+            ) {
+              telegramPartialFailures = (
+                failures as { chat_id: string; error: string }[]
+              )
+                .map((f) => `${f.chat_id}: ${f.error}`)
+                .join(" · ");
+            }
+          } else {
+            telegramStatus = "failed";
+            telegramError =
+              typeof notifyJson.error === "string"
+                ? notifyJson.error
+                : `HTTP ${notifyRes.status}`;
+          }
         }
       } catch {
         telegramStatus = "failed";
@@ -209,6 +238,7 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
         hash,
         telegramStatus,
         telegramError,
+        telegramPartialFailures,
       });
 
       try {
@@ -562,7 +592,16 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
               </a>
               <p className="text-xs text-muted-foreground">
                 Telegram notify:{" "}
-                {submitResult.telegramStatus === "sent" && "sent."}
+                {submitResult.telegramStatus === "sent" && (
+                  <>
+                    sent.
+                    {submitResult.telegramPartialFailures && (
+                      <span className="block mt-1 text-amber-600 dark:text-amber-500 font-mono text-[11px] break-words">
+                        Partial: {submitResult.telegramPartialFailures}
+                      </span>
+                    )}
+                  </>
+                )}
                 {submitResult.telegramStatus === "not_configured" && "not configured on server (memo is still on-chain)."}
                 {submitResult.telegramStatus === "skipped" && "skipped."}
                 {submitResult.telegramStatus === "failed" && (

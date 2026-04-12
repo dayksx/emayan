@@ -160,7 +160,8 @@ Use a funded account on `local` (for example Bedrock’s faucet against the loca
 
 ```bash
 bedrock faucet --network local
-# or: bedrock faucet --wallet sXXXXXXXXXXXXXXXXXXXXXXXXXXXXX --network local
+# By address: bedrock faucet --network local --address rXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# By seed:     bedrock faucet --network local --wallet sXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
 
 ### 4. Deploy the vault contract
@@ -310,9 +311,18 @@ What to do:
 1. **Retry later** — often transient.
 2. **Fund the wallet yourself**, then deploy with an explicit **`--wallet`** so the flow does not depend on the faucet inside `vault deploy`:
    - Create or import a wallet (`bedrock jade new …` / `bedrock jade import …` if your CLI supports it).
-   - When the public faucet works, run **`bedrock faucet --network alphanet --wallet <seed>`** (or use the faucet URL in a browser / curl per Nerdnest docs).
+   - When the public faucet works, fund by **classic address** (`r...`) or **seed** (`s...`): **`bedrock faucet --network alphanet --address r...`** or **`--wallet s...`**. Do **not** pass an `r` address to **`--wallet`** — Bedrock decodes that flag as a **seed**, which triggers **`version_invalid`**.
    - Deploy: **`bedrock vault deploy --network alphanet --wallet <same-seed>`**.
 3. **Skip rebuild** if you already have WASM: **`--skip-build`**.
+
+**`invalidTransaction` / `Unknown field` on `submit` (Alphanet)**
+
+Rippled is rejecting the **serialized transaction blob** before execution: the blob contains at least one **SField** the node does not list. Common cause: **Bedrock CLI and Alphanet rippled are out of sync**. For example, [Bedrock v0.2.1](https://github.com/XRPL-Commons/bedrock/releases/tag/v0.2.1) adds **`ComputationAllowance`** on vault/escrow transactions; if Alphanet’s validators run a build that does not define that field yet, you get `error_exception: Unknown field` (and off-the-shelf **`ripple-binary-codec`** may also fail to decode the same blob).
+
+What to do:
+
+1. **Align Bedrock with the network** — use a Bedrock release that matches what Alphanet runs, or deploy against **`bedrock node start`** using the Docker image recommended for your Bedrock version (local rippled and CLI stay paired). If you are on **v0.2.1** and only see this on public Alphanet, try **[v0.2.0](https://github.com/XRPL-Commons/bedrock/releases/tag/v0.2.0)** or watch for an Alphanet upgrade; check [XRPL-Commons/bedrock releases](https://github.com/XRPL-Commons/bedrock/releases) for notes.
+2. **Keep `network_id` accurate** — `[networks.alphanet].network_id` in `bedrock.toml` must match **`network_id`** from Alphanet RPC **`server_info`** (e.g. `curl -sS -X POST https://alphanet.rpc.nerdnest.xyz/ -H 'Content-Type: application/json' -d '{"method":"server_info","params":[{}]}'`). Mismatched **`NetworkID`** in signed txs causes other failures.
 
 ---
 

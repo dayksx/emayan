@@ -13,7 +13,8 @@ target = ''
 [networks]
 [networks.alphanet]
 url = 'wss://alphanet.nerdnest.xyz'
-network_id = 21465
+# Must match `network_id` from Alphanet `server_info` (see README — e.g. public RPC reports 21565, not 21465).
+network_id = 21565
 faucet_url = 'https://alphanet.faucet.nerdnest.xyz/accounts'
 
 [networks.local]

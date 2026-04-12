@@ -10,6 +10,7 @@ import { Label } from "./ui/label";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { AlertTriangle, CheckCircle2, Send, XCircle } from "lucide-react";
 import { buildGrievanceMemoText } from "../lib/grievance-memo";
+import { buildGrievanceTelegramText } from "../lib/telegram-grievance-text";
 
 const textareaClass =
   "min-h-[120px] w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50";
@@ -103,31 +104,53 @@ export function GrievanceForm({ onSubmitted }) {
 
       let telegramStatus = "skipped";
       let telegramError = null;
+      let telegramPartialFailures = null;
       try {
         const notifyRes = await fetch("/api/notify-telegram", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chatIdOrUsername: tg,
-            text:
-              `⚠️ Petty Ledger - grievance (XRPL testnet)\n\n` +
-              `From (filer): ${partyA}\n` +
-              `To (recipient / address you listed): ${dest}\n` +
-              `Cause: ${causeLabel}\n` +
-              `Amount in this payment: ${amountXrp} XRP\n\n` +
-              `Message:\n${grievance.trim().slice(0, 1500)}\n\n` +
-              `Tx: ${hash}`,
+            text: buildGrievanceTelegramText({
+              brandLine: "Petty Ledger",
+              filer: partyA,
+              recipient: dest,
+              cause: causeLabel,
+              amountXrp,
+              grievanceBody: grievance,
+              txHash: hash,
+            }),
           }),
         });
-        const notifyJson = await notifyRes.json();
-        if (notifyJson.skipped && notifyJson.reason === "telegram_bot_token_not_set") {
-          telegramStatus = "not_configured";
-        } else if (notifyJson.ok) {
-          telegramStatus = "sent";
-        } else {
+        const rawBody = await notifyRes.text();
+        let notifyJson = null;
+        try {
+          notifyJson = rawBody ? JSON.parse(rawBody) : {};
+        } catch {
           telegramStatus = "failed";
-          telegramError =
-            typeof notifyJson.error === "string" ? notifyJson.error : null;
+          telegramError = `notify returned invalid JSON (HTTP ${notifyRes.status})`;
+        }
+        if (telegramStatus !== "failed") {
+          if (notifyJson.skipped && notifyJson.reason === "telegram_bot_token_not_set") {
+            telegramStatus = "not_configured";
+          } else if (notifyJson.ok) {
+            telegramStatus = "sent";
+            if (
+              notifyJson.partial &&
+              Array.isArray(notifyJson.failures) &&
+              notifyJson.failures.length > 0
+            ) {
+              telegramPartialFailures = notifyJson.failures
+                .map((f) => `${f.chat_id}: ${f.error}`)
+                .join(" · ");
+            }
+          } else {
+            telegramStatus = "failed";
+            telegramError =
+              typeof notifyJson.error === "string"
+                ? notifyJson.error
+                : `HTTP ${notifyRes.status}`;
+          }
         }
       } catch {
         telegramStatus = "failed";
@@ -140,6 +163,7 @@ export function GrievanceForm({ onSubmitted }) {
         id: txResult.id,
         telegramStatus,
         telegramError,
+        telegramPartialFailures,
       });
 
       showStatus("Grievance recorded on-chain", "success");
@@ -266,8 +290,13 @@ export function GrievanceForm({ onSubmitted }) {
               autoComplete="off"
             />
             <p className="text-xs text-muted-foreground">
-              Server uses <code className="text-[11px]">TELEGRAM_BOT_TOKEN</code>. For DMs, they
-              must have started your bot with /start.
+              This can be any @username or
+              numeric chat id — you do not put your own id here unless you want the notice yourself.
+              Telegram only allows the bot to DM someone after that person has opened your bot and sent{" "}
+              <code className="text-[11px]">/start</code> once (that is Telegram’s rule, not ours).
+              Optionally, <code className="text-[11px]">TELEGRAM_NOTIFY_CHAT_ID</code> in{" "}
+              <code className="text-[11px]">.env</code> sends an extra copy to you as the site operator
+              for debugging; it is not required for notifying arbitrary handles.
             </p>
           </div>
 
@@ -302,7 +331,16 @@ export function GrievanceForm({ onSubmitted }) {
                   {result.id != null && <p className="text-xs">ID: {result.id}</p>}
                   <p className="text-xs">
                     Telegram:{" "}
-                    {result.telegramStatus === "sent" && "notification sent."}
+                    {result.telegramStatus === "sent" && (
+                      <>
+                        notification sent.
+                        {result.telegramPartialFailures && (
+                          <span className="block mt-1 text-amber-600 dark:text-amber-500 font-mono text-[11px] break-words">
+                            Partial: {result.telegramPartialFailures}
+                          </span>
+                        )}
+                      </>
+                    )}
                     {result.telegramStatus === "not_configured" &&
                       "bot token not set on server — memo is still on-chain."}
                     {result.telegramStatus === "skipped" && "not sent."}
