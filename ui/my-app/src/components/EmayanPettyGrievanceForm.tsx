@@ -15,6 +15,7 @@ import { txExplorerUrl } from "../../lib/xrpl-explorer";
 const MOCK_DONATION_CAUSES = [
   { id: "flat-earth", emoji: "🌍", name: "The Flat Earth Society" },
   { id: "man-utd", emoji: "⚽", name: "Manchester United Foundation" },
+  { id: "real-madrid-foundation", emoji: "👑", name: "Real Madrid Foundation" },
   { id: "nickelback", emoji: "🎸", name: "Nickelback" },
   { id: "pigeon", emoji: "🐦", name: "Penny's Pigeon Aid" },
 ];

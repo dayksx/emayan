@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Youtube } from "lucide-react";
+import { Send, Youtube } from "lucide-react";
 import { WalletConnector } from "../../components/WalletConnector";
 import { useWallet } from "../../components/providers/WalletProvider";
 import { Badge } from "../../components/ui/badge";
@@ -31,15 +31,26 @@ const Nav = () => {
             Petty Ledger
           </span>
         </Link>
-        <a
-          href="https://youtu.be/u8Oq7BmSdNw"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-muted-foreground/50 transition-colors hover:text-[#FF0000]/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
-          aria-label="Watch on YouTube"
-        >
-          <Youtube className="h-[18px] w-[18px] sm:h-5 sm:w-5" strokeWidth={1.5} />
-        </a>
+        <div className="flex items-center gap-2">
+          <a
+            href="https://youtu.be/u8Oq7BmSdNw"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground/50 transition-colors hover:text-[#FF0000]/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+            aria-label="Watch on YouTube"
+          >
+            <Youtube className="h-[18px] w-[18px] sm:h-5 sm:w-5" strokeWidth={1.5} />
+          </a>
+          <a
+            href="https://t.me/PettyLedgerBot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground/50 transition-colors hover:text-[#229ED9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+            aria-label="Petty Ledger on Telegram"
+          >
+            <Send className="h-[18px] w-[18px] sm:h-5 sm:w-5" strokeWidth={1.5} />
+          </a>
+        </div>
       </div>
       <div className="flex min-w-0 flex-1 items-center justify-end gap-4 sm:gap-6">
         {statusMessage && (
