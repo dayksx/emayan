@@ -1,6 +1,8 @@
 # Scaffold-XRP
 
-A Next.js-based development stack for building decentralized applications on XRPL with smart contracts. Built with Turborepo, inspired by Scaffold-ETH-2.
+A Next.js-based development stack for building decentralized applications on XRPL with smart contracts.
+
+**Petty Ledger (Emayan):** on-chain grievance recording, XRP custody, and withdrawal rules live in the **smart vault** under [`contracts/freelance-agreement-factory/`](../../contracts/freelance-agreement-factory/README.md). The UI should target that contract’s memo format and vault address when wiring stake-based flows. Built with Turborepo, inspired by Scaffold-ETH-2.
 
 ## Features
 

@@ -5,9 +5,14 @@ import { useWalletManager } from "../hooks/useWalletManager";
 import { useWallet } from "./providers/WalletProvider";
 import { Badge } from "./ui/badge";
 
+function truncateAddr(addr) {
+  if (!addr || addr.length < 12) return addr;
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
 export function Header() {
   useWalletManager();
-  const { statusMessage } = useWallet();
+  const { statusMessage, isConnected, accountInfo } = useWallet();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/70">
@@ -19,7 +24,7 @@ export function Header() {
           </div>
           <div className="flex flex-col gap-0.5">
             <span className="text-sm font-semibold tracking-tight text-foreground">
-              Scaffold-XRP
+              Emayan
             </span>
             <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               XRPL · Testnet
@@ -27,10 +32,10 @@ export function Header() {
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
           {statusMessage && (
             <Badge
-              className="max-w-[min(100%,18rem)] truncate shadow-none"
+              className="max-w-[min(100%,12rem)] truncate shadow-none sm:max-w-[min(100%,14rem)]"
               variant={
                 statusMessage.type === "success"
                   ? "success"
@@ -44,6 +49,28 @@ export function Header() {
             >
               {statusMessage.message}
             </Badge>
+          )}
+          {isConnected && accountInfo && (
+            <div
+              className="hidden min-w-0 max-w-[min(100%,20rem)] items-center gap-2 rounded-lg border border-border/80 bg-secondary/50 px-2.5 py-1.5 text-left md:flex"
+              title={accountInfo.address}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-mono text-[11px] leading-tight text-foreground">
+                  {truncateAddr(accountInfo.address)}
+                </p>
+                <p className="truncate text-[10px] text-muted-foreground">
+                  {accountInfo.walletName} · {accountInfo.network}
+                </p>
+              </div>
+            </div>
+          )}
+          {isConnected && accountInfo && (
+            <div className="flex min-w-0 max-w-[10rem] flex-col rounded-md border border-border/80 bg-secondary/50 px-2 py-1 md:hidden">
+              <span className="truncate font-mono text-[10px] text-foreground">
+                {truncateAddr(accountInfo.address)}
+              </span>
+            </div>
           )}
           <WalletConnector />
         </div>

@@ -1,0 +1,58 @@
+primitives = ['escrow', 'vault']
+
+[project]
+name = 'freelance-agreement-factory'
+version = '0.1.0'
+authors = ['Your Name']
+
+[build]
+source = ''
+output = ''
+target = ''
+
+[networks]
+[networks.alphanet]
+url = 'wss://alphanet.nerdnest.xyz'
+network_id = 21465
+faucet_url = 'https://alphanet.faucet.nerdnest.xyz/accounts'
+
+[networks.local]
+url = 'ws://localhost:6006'
+network_id = 100
+faucet_url = 'http://localhost:8080/faucet'
+
+# Used by commands that support testnet (e.g. bedrock deploy). vault deploy only allows local|alphanet.
+[networks.testnet]
+url = 'wss://s.altnet.rippletest.net:51233/'
+network_id = 1
+faucet_url = 'https://faucet.altnet.rippletest.net/accounts'
+
+[escrows]
+[escrows.main]
+source = 'escrow/src/lib.rs'
+output = 'escrow/target/wasm32v1-none/release'
+
+[vaults]
+[vaults.main]
+source = 'vault/src/lib.rs'
+output = 'vault/target/wasm32v1-none/release'
+
+[wallets]
+keystore = '.wallets/keystore.json'
+
+[local_node]
+config_dir = '.bedrock/node-config'
+docker_image = 'lejamon/rippled_smart_contract_vault_x86'
+ledger_interval = 1000
+
+[test]
+fuzz_runs = 0
+fuzz_seed = 0
+integration_network = ''
+fixtures_dir = ''
+
+[snapshot]
+file = ''
+
+[doc]
+output = ''

@@ -1,0 +1,12 @@
+# Build outputs
+escrow/target/
+*.wasm
+
+# Wallets (keep private!)
+.wallets/
+
+# Bedrock internal
+.bedrock/
+
+# OS files
+.DS_Store
