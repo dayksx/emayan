@@ -16,7 +16,7 @@ import {
   StateSchema,
 } from "@langchain/langgraph";
 import { Telegraf } from "telegraf";
-import { loadPettyLedgerReadme } from "./readmeContext.js";
+import { loadAgentReadmes } from "./readmeContext.js";
 
 const LLM_KEY = process.env.LLM_API_KEY ?? process.env.OPENAI_API_KEY;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -31,17 +31,17 @@ if (!TELEGRAM_BOT_TOKEN) {
 }
 console.log("✅ Environment variables look good (LLM + Telegram).");
 
-const pettyLedgerReadme = loadPettyLedgerReadme();
+const agentDocumentation = loadAgentReadmes();
 
 const systemPrompt = `You are the **Petty Ledger** guide for Telegram (project codename Emayan). Help users understand and use the grievance ledger on the XRP Ledger: filing types, memos, optional stakes, Telegram cards, Type 4 escrow/magic links, and how the UI and chain fit together.
 
 Rules:
-- Ground answers in the specification below; if something is not covered, say you are not sure.
+- Ground answers in the documentation below; if something is not covered, say you are not sure.
 - Be concise. Users sign transactions in their own wallet (client-side); you explain steps and concepts—you do not execute chain actions for them.
 - When relevant, point to the \`petty_ledger\` smart contract and repo layout described in the spec.
 
---- Petty Ledger technical specification (README.md) ---
-${pettyLedgerReadme}
+--- Agent context (repository README + ai/README.md) ---
+${agentDocumentation}
 ---`;
 
 const State = new StateSchema({
