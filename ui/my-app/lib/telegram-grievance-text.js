@@ -9,7 +9,7 @@ export const PETTY_LEDGER_NOTIFICATION_TITLE = "Petty Ledger Notification 🙂";
  *   brandLine?: string;
  *   filer: string;
  *   recipient: string;
- *   cause: string;
+ *   cause?: string;
  *   amountXrp: string;
  *   grievanceBody: string;
  *   txHash: string;
@@ -18,6 +18,10 @@ export const PETTY_LEDGER_NOTIFICATION_TITLE = "Petty Ledger Notification 🙂";
 export function buildGrievanceTelegramText(p) {
   const brandLine = p.brandLine ?? PETTY_LEDGER_NOTIFICATION_TITLE;
   const msg = p.grievanceBody.trim().slice(0, 1500);
+  const causeExtra =
+    p.cause != null && String(p.cause).trim()
+      ? [`🏷 Cause`, `   ${String(p.cause).trim()}`, ``]
+      : [];
   const lines = [
     `✨ ${brandLine}`,
     `📋 New grievance`,
@@ -31,9 +35,7 @@ export function buildGrievanceTelegramText(p) {
     `📬 Recipient`,
     `   ${p.recipient}`,
     ``,
-    `🏷 Cause`,
-    `   ${p.cause}`,
-    ``,
+    ...causeExtra,
     `💰 Amount`,
     `   ${p.amountXrp} XRP`,
     ``,

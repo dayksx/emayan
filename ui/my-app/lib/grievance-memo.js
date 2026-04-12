@@ -1,6 +1,9 @@
 /** XRPL memos are hex on the wire; we store human-readable UTF-8 text. */
 export const MAX_MEMO_UTF8_BYTES = 3800;
 
+/** UI label for the filing path that stores a correction deadline on-chain (see `correctionUntilIso`). */
+export const CORRECTION_WINDOW_POLICY_LABEL = "Give them a chance to correct it";
+
 export const CAUSES = [
   { value: "unpaid_work", label: "Unpaid work, invoice, or deliverables" },
   { value: "broken_deadline", label: "Missed deadline / vanished before delivery" },
@@ -41,12 +44,16 @@ export function truncateUtf8Bytes(str, maxBytes) {
 
 /**
  * Single-line memo for explorers:
- * Petty Ledger - Cause: <grievance> - Amount: x XRP - From: … - To: …
+ * Petty Ledger - Cause: <grievance> - Amount: x XRP - From: … - To: … [ - Correction until: ISO8601 ]
  * Whitespace in the grievance is collapsed to one line so " - " separators stay readable.
+ * @param {{ filer: string, to: string, amountXrp: string, grievanceBody: string, correctionUntilIso?: string }} p
  */
-export function buildGrievanceMemoText({ filer, to, amountXrp, grievanceBody }) {
+export function buildGrievanceMemoText({ filer, to, amountXrp, grievanceBody, correctionUntilIso }) {
   const causeText = grievanceBody.trim().replace(/\s+/g, " ");
-  const line = `Petty Ledger - Cause: ${causeText} - Amount: ${amountXrp} XRP - From: ${filer} - To: ${to}`;
+  let line = `Petty Ledger - Cause: ${causeText} - Amount: ${amountXrp} XRP - From: ${filer} - To: ${to}`;
+  if (correctionUntilIso && String(correctionUntilIso).trim()) {
+    line += ` - Correction until: ${String(correctionUntilIso).trim()}`;
+  }
 
   return truncateUtf8Bytes(line, MAX_MEMO_UTF8_BYTES);
 }
@@ -56,11 +63,19 @@ const TX_HASH_RE = "[A-Fa-f0-9]{64}";
 
 /**
  * Parse a Petty Ledger grievance memo line (same shape as buildGrievanceMemoText).
- * @returns {{ cause: string, amountXrp: string, from: string, to: string } | null}
+ * @returns {{ cause: string, amountXrp: string, from: string, to: string, correctionUntilIso: string | null } | null}
  */
 export function parsePettyLedgerGrievanceMemo(text) {
   if (!text || typeof text !== "string") return null;
-  const s = text.trim();
+  let s = text.trim();
+  const correctionMarker = " - Correction until: ";
+  let correctionUntilIso = null;
+  const cidx = s.lastIndexOf(correctionMarker);
+  if (cidx !== -1) {
+    correctionUntilIso = s.slice(cidx + correctionMarker.length).trim() || null;
+    s = s.slice(0, cidx);
+  }
+
   const causePrefix = "Petty Ledger - Cause: ";
   const amountSep = " - Amount: ";
   if (!s.startsWith(causePrefix)) return null;
@@ -73,7 +88,22 @@ export function parsePettyLedgerGrievanceMemo(text) {
   );
   const m = re.exec(tail);
   if (!m) return null;
-  return { cause, amountXrp: m[1], from: m[2], to: m[3] };
+  return { cause, amountXrp: m[1], from: m[2], to: m[3], correctionUntilIso };
+}
+
+/**
+ * Whether the filer may record an on-chain resolution (amicable) for this memo.
+ * @param {{ correctionUntilIso?: string | null }} parsed
+ * @returns {{ state: 'allowed', until: Date } | { state: 'no_window' } | { state: 'too_late', until: Date } | { state: 'invalid_date' }}
+ */
+export function getGrievanceResolutionEligibility(parsed, now = new Date()) {
+  if (!parsed) return { state: "no_window" };
+  const iso = parsed.correctionUntilIso;
+  if (!iso || !String(iso).trim()) return { state: "no_window" };
+  const end = new Date(iso);
+  if (Number.isNaN(end.getTime())) return { state: "invalid_date" };
+  if (now.getTime() <= end.getTime()) return { state: "allowed", until: end };
+  return { state: "too_late", until: end };
 }
 
 /**

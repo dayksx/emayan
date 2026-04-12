@@ -20,7 +20,6 @@ export function GrievanceForm({ onSubmitted }) {
   const [destination, setDestination] = useState("");
   const [amountXrp, setAmountXrp] = useState("");
   const [grievance, setGrievance] = useState("");
-  const [cause, setCause] = useState("");
   const [telegramHandle, setTelegramHandle] = useState("");
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,10 +41,6 @@ export function GrievanceForm({ onSubmitted }) {
     }
     if (dest === partyA) {
       showStatus("Recipient address must differ from your own", "error");
-      return;
-    }
-    if (cause.trim().length < 2) {
-      showStatus("Enter a cause for the on-chain memo (at least 2 characters)", "error");
       return;
     }
     if (grievance.trim().length < 10) {
@@ -71,7 +66,6 @@ export function GrievanceForm({ onSubmitted }) {
       return;
     }
 
-    const causeLabel = cause.trim();
     const memoPlainText = buildGrievanceMemoText({
       filer: partyA,
       to: dest,
@@ -114,7 +108,6 @@ export function GrievanceForm({ onSubmitted }) {
             text: buildGrievanceTelegramText({
               filer: partyA,
               recipient: dest,
-              cause: causeLabel,
               amountXrp,
               grievanceBody: grievance,
               txHash: hash,
@@ -166,11 +159,10 @@ export function GrievanceForm({ onSubmitted }) {
       });
 
       showStatus("Grievance recorded on-chain", "success");
-      addEvent("Grievance payment submitted", { hash, cause: causeLabel, telegramStatus });
+      addEvent("Grievance payment submitted", { hash, telegramStatus });
 
       setDestination("");
       setAmountXrp("");
-      setCause("");
       setGrievance("");
       setTelegramHandle("");
       onSubmitted?.();
@@ -203,7 +195,7 @@ export function GrievanceForm({ onSubmitted }) {
         <CardContent>
           <p className="text-sm leading-relaxed text-muted-foreground">
             You will send a testnet payment whose memo field contains your grievance as readable text
-            (plus cause and addresses). Telegram notify is optional if the server has a bot token.
+            (plus addresses). Telegram notify is optional if the server has a bot token.
           </p>
         </CardContent>
       </Card>
@@ -251,19 +243,7 @@ export function GrievanceForm({ onSubmitted }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cause">Cause summary (Telegram notify)</Label>
-            <Input
-              id="cause"
-              type="text"
-              placeholder="Short label for the Telegram ping (not the on-chain memo line)"
-              value={cause}
-              onChange={(e) => setCause(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="grievance">Your grievance (on-chain memo as Cause: …)</Label>
+            <Label htmlFor="grievance">Your grievance (on-chain memo)</Label>
             <textarea
               id="grievance"
               className={textareaClass}
@@ -273,7 +253,7 @@ export function GrievanceForm({ onSubmitted }) {
               required
             />
             <p className="text-xs text-muted-foreground">
-              The memo is one line: Petty Ledger — Cause (this text) — amount — from/to. UTF-8{" "}
+              The memo is one line: Petty Ledger — this text — amount — from/to. UTF-8{" "}
               <code className="text-[11px]">text/plain</code>. Very long text may be truncated.
             </p>
           </div>

@@ -4,7 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { convertStringToHex, isValidClassicAddress, xrpToDrops } from "xrpl";
 import { useWallet } from "../../components/providers/WalletProvider";
-import { CAUSES, buildGrievanceMemoText } from "../../lib/grievance-memo";
+import {
+  CORRECTION_WINDOW_POLICY_LABEL,
+  buildGrievanceMemoText,
+} from "../../lib/grievance-memo";
 import { buildGrievanceTelegramText } from "../../lib/telegram-grievance-text";
 import { txExplorerUrl } from "../../lib/xrpl-explorer";
 
@@ -53,7 +56,6 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
   const [accused, setAccused] = useState("");
   const [destination, setDestination] = useState("");
   const [amountXrp, setAmountXrp] = useState("");
-  const [cause, setCause] = useState(CAUSES[0].value);
   const [telegramHandle, setTelegramHandle] = useState("");
   const [confirmStage, setConfirmStage] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -142,12 +144,28 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
       return;
     }
 
-    const causeLabel = CAUSES.find((c) => c.value === cause)?.label ?? cause;
+    let correctionUntilIso: string | undefined;
+    if (filingType === 4) {
+      if (!deadline.trim()) {
+        fail(
+          `Set a correction deadline when you choose "${CORRECTION_WINDOW_POLICY_LABEL}" (mock filing step).`
+        );
+        return;
+      }
+      const d = new Date(deadline);
+      if (Number.isNaN(d.getTime())) {
+        fail("Invalid correction deadline.");
+        return;
+      }
+      correctionUntilIso = d.toISOString();
+    }
+
     const memoPlainText = buildGrievanceMemoText({
       filer: partyA,
       to: dest,
       amountXrp,
       grievanceBody: grievance,
+      correctionUntilIso,
     });
 
     setIsLoading(true);
@@ -183,7 +201,6 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
             text: buildGrievanceTelegramText({
               filer: partyA,
               recipient: dest,
-              cause: causeLabel,
               amountXrp,
               grievanceBody: grievance,
               txHash: hash,
@@ -230,7 +247,7 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
       }
 
       showStatus("Grievance recorded on-chain", "success");
-      addEvent("Grievance payment submitted", { hash, cause, telegramStatus });
+      addEvent("Grievance payment submitted", { hash, telegramStatus });
 
       setSubmitResult({
         status: "success",
@@ -382,25 +399,6 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
         </div>
         <div>
           <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
-            Cause
-          </label>
-          <select
-            className="form-input-underline font-body cursor-pointer"
-            value={cause}
-            onChange={(e) => {
-              setCause(e.target.value);
-              setConfirmStage(false);
-            }}
-          >
-            {CAUSES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
             Culprit&apos;s Telegram (notify)
           </label>
           <input
@@ -433,7 +431,7 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
               setConfirmStage(false);
             }}
           >
-            <option value="">— a cause they would hate —</option>
+            <option value="">— pick a charity (mock) —</option>
             {MOCK_DONATION_CAUSES.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.emoji} {c.name}
@@ -505,7 +503,7 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
               <div className="space-y-4 animate-fade-in-down">
                 <div>
                   <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
-                    Deadline for correction (mock)
+                    Deadline for correction (stored in payment memo)
                   </label>
                   <input
                     type="datetime-local"

@@ -13,7 +13,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Button } from "./ui/button";
 import { txExplorerUrl, TESTNET_WSS } from "../lib/xrpl-explorer";
 import {
+  CORRECTION_WINDOW_POLICY_LABEL,
   buildGrievanceResolutionMemoText,
+  getGrievanceResolutionEligibility,
   parsePettyLedgerGrievanceMemo,
   parsePettyLedgerResolutionMemo,
 } from "../lib/grievance-memo";
@@ -191,6 +193,17 @@ export function SentTransactionsPanel({ refreshKey = 0 }) {
     if (!g || !address || !walletManager?.signAndSubmit) return;
     if (row.resolvedBy) return;
 
+    const elig = getGrievanceResolutionEligibility(g);
+    if (elig.state !== "allowed") {
+      showStatus(
+        elig.state === "too_late"
+          ? "Too late to repair — this grievance stays on chain as filed."
+          : "Resolution is only allowed when a correction deadline was set on the original memo.",
+        "error"
+      );
+      return;
+    }
+
     const memoPlain = buildGrievanceResolutionMemoText({
       originalTxHash: row.hash,
       filer: g.from,
@@ -269,9 +282,10 @@ export function SentTransactionsPanel({ refreshKey = 0 }) {
       </div>
 
       <p className="mb-6 font-body text-sm text-muted-foreground">
-        If you <span className="text-foreground/90">filed</span> a grievance (issuer), you can record a
-        resolution by signing a 1-drop payment to the original grievance recipient with a resolution
-        memo (avoids wallet bugs with self-payments).
+        As <span className="text-foreground/90">issuer</span>, you may record a resolution only if the
+        memo includes a correction deadline (filed with &quot;{CORRECTION_WINDOW_POLICY_LABEL}&quot;)
+        and the deadline has not passed. Then sign a 1-drop payment to the original recipient with the
+        resolution memo.
       </p>
 
       {error && (
@@ -296,7 +310,12 @@ export function SentTransactionsPanel({ refreshKey = 0 }) {
               row.kind === "grievance" &&
               row.grievanceParsed &&
               row.grievanceParsed.from === address;
-            const canResolve = isIssuer && !row.resolvedBy;
+            const elig =
+              row.kind === "grievance" && row.grievanceParsed
+                ? getGrievanceResolutionEligibility(row.grievanceParsed)
+                : { state: "no_window" };
+            const canResolve =
+              isIssuer && !row.resolvedBy && elig.state === "allowed";
             const busy = cancellingHash === row.hash;
 
             return (
@@ -330,6 +349,32 @@ export function SentTransactionsPanel({ refreshKey = 0 }) {
                     {row.memoText || "(empty memo)"}
                   </p>
                 )}
+
+                {isIssuer && row.kind === "grievance" && !row.resolvedBy && elig.state === "no_window" && (
+                  <p className="mb-3 border-l-2 border-border pl-3 font-body text-xs leading-relaxed text-muted-foreground">
+                    No on-chain correction window: only grievances filed with &quot;
+                    {CORRECTION_WINDOW_POLICY_LABEL}&quot; and a deadline can be resolved here.
+                  </p>
+                )}
+                {isIssuer && row.kind === "grievance" && !row.resolvedBy && elig.state === "too_late" && (
+                  <p className="mb-3 border-l-2 border-amber-600/50 pl-3 font-body text-sm leading-relaxed text-amber-900 dark:text-amber-100/90">
+                    Too late to repair — this is forever on chain.
+                  </p>
+                )}
+                {isIssuer && row.kind === "grievance" && !row.resolvedBy && elig.state === "invalid_date" && (
+                  <p className="mb-3 border-l-2 border-border pl-3 font-mono text-xs text-muted-foreground">
+                    This memo has a correction field that could not be read; resolution is blocked.
+                  </p>
+                )}
+                {isIssuer &&
+                  row.kind === "grievance" &&
+                  !row.resolvedBy &&
+                  elig.state === "allowed" &&
+                  elig.until && (
+                    <p className="mb-3 font-mono text-[10px] text-muted-foreground">
+                      Correction window open until {elig.until.toLocaleString()}
+                    </p>
+                  )}
 
                 {canResolve && (
                   <div className="mb-4">
