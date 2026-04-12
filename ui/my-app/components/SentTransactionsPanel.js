@@ -9,18 +9,20 @@ import { ExternalLink, Inbox, Loader2 } from "lucide-react";
 
 function decodeMemos(memos) {
   if (!memos?.length) return [];
-  return memos.map((entry) => {
-    const m = entry.Memo;
-    if (!m) return null;
-    try {
-      const data = m.MemoData ? convertHexToString(m.MemoData) : "";
-      const type = m.MemoType ? convertHexToString(m.MemoType) : "";
-      const format = m.MemoFormat ? convertHexToString(m.MemoFormat) : "";
-      return { data, type, format };
-    } catch {
-      return { data: "(could not decode memo)", type: "", format: "" };
-    }
-  }).filter(Boolean);
+  return memos
+    .map((entry) => {
+      const m = entry.Memo;
+      if (!m) return null;
+      try {
+        const data = m.MemoData ? convertHexToString(m.MemoData) : "";
+        const type = m.MemoType ? convertHexToString(m.MemoType) : "";
+        const format = m.MemoFormat ? convertHexToString(m.MemoFormat) : "";
+        return { data, type, format };
+      } catch {
+        return { data: "(could not decode memo)", type: "", format: "" };
+      }
+    })
+    .filter(Boolean);
 }
 
 function truncateMid(s, left = 6, right = 4) {
@@ -28,6 +30,7 @@ function truncateMid(s, left = 6, right = 4) {
   return `${s.slice(0, left)}…${s.slice(-right)}`;
 }
 
+/** Uses design tokens from globals (:root light paper theme). */
 export function SentTransactionsPanel({ refreshKey = 0 }) {
   const { isConnected, accountInfo } = useWallet();
   const [rows, setRows] = useState([]);
@@ -92,8 +95,7 @@ export function SentTransactionsPanel({ refreshKey = 0 }) {
             }
           }
 
-          const dateIso =
-            typeof tx.date === "number" ? rippleTimeToISOTime(tx.date) : null;
+          const dateIso = typeof tx.date === "number" ? rippleTimeToISOTime(tx.date) : null;
 
           out.push({
             hash,
@@ -137,13 +139,17 @@ export function SentTransactionsPanel({ refreshKey = 0 }) {
 
   if (!isConnected || !accountInfo) {
     return (
-      <Card className="border-dashed border-border/60 bg-card/40">
+      <Card className="border-dashed border-border/60 bg-card/50">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Sent transactions (with memo)</CardTitle>
-          <CardDescription>Connect your wallet to load your testnet history</CardDescription>
+          <CardTitle className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            Sent transactions (with memo)
+          </CardTitle>
+          <CardDescription className="font-body text-sm text-muted-foreground">
+            Connect your wallet to load your testnet history
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
+          <p className="font-body text-sm text-muted-foreground">
             Outgoing payments that include a memo will appear here after you connect.
           </p>
         </CardContent>
@@ -152,85 +158,73 @@ export function SentTransactionsPanel({ refreshKey = 0 }) {
   }
 
   return (
-    <Card className="flex min-h-[320px] flex-col md:min-h-[480px]">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <CardTitle className="text-base">Your sent transactions</CardTitle>
-            <CardDescription>Outgoing payments that include a memo (testnet)</CardDescription>
-          </div>
+    <div className="w-full">
+      <div className="mb-8 flex items-center justify-between border-b border-border pb-4">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          Your memos
+        </span>
+        <div className="flex items-center gap-1.5">
           {loading && (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" aria-hidden />
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" aria-hidden />
           )}
+          <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+          <span className="font-mono text-[10px] uppercase tracking-wider text-primary">
+            XRPL testnet
+          </span>
         </div>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-3 overflow-hidden pt-0">
-        {error && (
-          <p className="text-sm text-red-400" role="alert">
-            {error}
+      </div>
+
+      {error && (
+        <p className="mb-4 font-mono text-xs text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+
+      {!loading && !error && rows.length === 0 && (
+        <div className="flex flex-col items-center justify-center gap-2 border border-dashed border-border py-12 text-center">
+          <Inbox className="h-8 w-8 text-muted-foreground" aria-hidden />
+          <p className="font-body text-sm text-muted-foreground">
+            No outgoing payments with memos found for this account yet.
           </p>
-        )}
-        {!loading && !error && rows.length === 0 && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/60 bg-secondary/20 py-12 text-center">
-            <Inbox className="h-8 w-8 text-muted-foreground" aria-hidden />
-            <p className="text-sm text-muted-foreground">
-              No outgoing payments with memos found for this account yet.
-            </p>
-          </div>
-        )}
-        {rows.length > 0 && (
-          <ul className="max-h-[min(70vh,560px)] space-y-3 overflow-y-auto pr-1">
-            {rows.map((row) => (
-              <li
-                key={row.hash}
-                className="rounded-lg border border-border/80 bg-secondary/25 p-3 text-sm shadow-sm"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2">
-                  <a
-                    href={txExplorerUrl(row.hash)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
-                  >
-                    {truncateMid(row.hash, 8, 6)}
-                    <ExternalLink className="h-3 w-3 opacity-70" aria-hidden />
-                  </a>
-                  {row.dateIso && (
-                    <time
-                      className="text-[11px] text-muted-foreground"
-                      dateTime={row.dateIso}
-                    >
-                      {new Date(row.dateIso).toLocaleString()}
-                    </time>
-                  )}
-                </div>
-                <div className="mt-2 space-y-1.5 text-xs">
-                  <div className="flex flex-wrap gap-x-3 gap-y-1">
-                    <span className="text-muted-foreground">To</span>
-                    <code className="break-all text-[11px] text-foreground/90">
-                      {truncateMid(row.destination, 10, 10)}
-                    </code>
-                  </div>
-                  {row.amountXrp != null && (
-                    <div>
-                      <span className="text-muted-foreground">Amount </span>
-                      <span className="font-medium tabular-nums">{row.amountXrp} XRP</span>
-                    </div>
-                  )}
-                  <div className="mt-2 rounded-md border border-border/60 bg-background/40 p-2.5">
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Memo
-                    </p>
-                    <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-sans text-[12px] leading-relaxed text-foreground/95">
-                      {row.memoText || "(empty)"}
-                    </pre>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <ul className="max-h-[min(70vh,560px)] space-y-0 overflow-y-auto pr-1">
+          {rows.map((row) => (
+            <li key={row.hash} className="border-b border-border py-6 transition-colors sm:py-8">
+              <p className="mb-4 font-serif text-base font-normal leading-relaxed tracking-wide text-foreground sm:text-lg">
+                {row.memoText || "(empty memo)"}
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <a
+                  href={txExplorerUrl(row.hash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded-sm border border-blue-border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary hover:opacity-90"
+                >
+                  {truncateMid(row.hash, 8, 6)}
+                  <ExternalLink className="h-3 w-3 opacity-70" aria-hidden />
+                </a>
+                <span className="text-muted-extra">·</span>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {row.amountXrp != null ? `${row.amountXrp} XRP` : "—"}
+                </span>
+                <span className="text-muted-extra">·</span>
+                {row.dateIso && (
+                  <time className="font-mono text-[10px] text-muted-foreground" dateTime={row.dateIso}>
+                    {new Date(row.dateIso).toLocaleString()}
+                  </time>
+                )}
+                <span className="text-muted-extra">·</span>
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  To {truncateMid(row.destination, 10, 10)}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { WalletConnector } from "./WalletConnector";
-import { useWalletManager } from "../hooks/useWalletManager";
 import { useWallet } from "./providers/WalletProvider";
 import { Badge } from "./ui/badge";
 
@@ -11,7 +10,6 @@ function truncateAddr(addr) {
 }
 
 export function Header() {
-  useWalletManager();
   const { statusMessage, isConnected, accountInfo } = useWallet();
 
   return (

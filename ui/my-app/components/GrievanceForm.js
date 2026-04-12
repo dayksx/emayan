@@ -9,52 +9,17 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { AlertTriangle, CheckCircle2, Send, XCircle } from "lucide-react";
-
-const CAUSES = [
-  { value: "unpaid_work", label: "Unpaid work or deliverables" },
-  { value: "broken_deadline", label: "Missed deadline / no delivery" },
-  { value: "contract_breach", label: "Breach of agreed terms" },
-  { value: "conduct", label: "Harassment or unacceptable conduct" },
-  { value: "other", label: "Other — describe below" },
-];
+import { buildGrievanceMemoText } from "../lib/grievance-memo";
 
 const textareaClass =
   "min-h-[120px] w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50";
-
-/** XRPL memos are hex on the wire; we store human-readable UTF-8 text (decoded as plain text in explorers). */
-const MAX_MEMO_UTF8_BYTES = 3800;
-
-function truncateUtf8Bytes(str, maxBytes) {
-  const enc = new TextEncoder();
-  if (enc.encode(str).length <= maxBytes) return str;
-  let end = str.length;
-  while (end > 0 && enc.encode(str.slice(0, end)).length > maxBytes) end -= 1;
-  return `${str.slice(0, end)}\n\n…(memo truncated to fit transaction limits)`;
-}
-
-function buildGrievanceMemoText({ filer, to, causeLabel, amountXrp, grievanceBody }) {
-  const header = [
-    "EMayan — grievance (XRPL testnet)",
-    "",
-    `Cause: ${causeLabel}`,
-    `Amount: ${amountXrp} XRP`,
-    `From: ${filer}`,
-    `To: ${to}`,
-    "",
-    "---",
-    "",
-    grievanceBody.trim(),
-  ].join("\n");
-
-  return truncateUtf8Bytes(header, MAX_MEMO_UTF8_BYTES);
-}
 
 export function GrievanceForm({ onSubmitted }) {
   const { walletManager, isConnected, accountInfo, addEvent, showStatus } = useWallet();
   const [destination, setDestination] = useState("");
   const [amountXrp, setAmountXrp] = useState("");
   const [grievance, setGrievance] = useState("");
-  const [cause, setCause] = useState(CAUSES[0].value);
+  const [cause, setCause] = useState("");
   const [telegramHandle, setTelegramHandle] = useState("");
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -76,6 +41,10 @@ export function GrievanceForm({ onSubmitted }) {
     }
     if (dest === partyA) {
       showStatus("Recipient address must differ from your own", "error");
+      return;
+    }
+    if (cause.trim().length < 2) {
+      showStatus("Enter a cause for the on-chain memo (at least 2 characters)", "error");
       return;
     }
     if (grievance.trim().length < 10) {
@@ -101,11 +70,10 @@ export function GrievanceForm({ onSubmitted }) {
       return;
     }
 
-    const causeLabel = CAUSES.find((c) => c.value === cause)?.label ?? cause;
+    const causeLabel = cause.trim();
     const memoPlainText = buildGrievanceMemoText({
       filer: partyA,
       to: dest,
-      causeLabel,
       amountXrp,
       grievanceBody: grievance,
     });
@@ -142,7 +110,7 @@ export function GrievanceForm({ onSubmitted }) {
           body: JSON.stringify({
             chatIdOrUsername: tg,
             text:
-              `⚠️ Emayan grievance (XRPL testnet)\n\n` +
+              `⚠️ Petty Ledger - grievance (XRPL testnet)\n\n` +
               `From (filer): ${partyA}\n` +
               `To (recipient / address you listed): ${dest}\n` +
               `Cause: ${causeLabel}\n` +
@@ -175,10 +143,11 @@ export function GrievanceForm({ onSubmitted }) {
       });
 
       showStatus("Grievance recorded on-chain", "success");
-      addEvent("Grievance payment submitted", { hash, cause, telegramStatus });
+      addEvent("Grievance payment submitted", { hash, cause: causeLabel, telegramStatus });
 
       setDestination("");
       setAmountXrp("");
+      setCause("");
       setGrievance("");
       setTelegramHandle("");
       onSubmitted?.();
@@ -229,7 +198,7 @@ export function GrievanceForm({ onSubmitted }) {
       </CardHeader>
 
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div className="space-y-2">
             <Label htmlFor="destination">Recipient XRPL address</Label>
             <Input
@@ -259,23 +228,19 @@ export function GrievanceForm({ onSubmitted }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cause">Cause (why they should answer / remedy)</Label>
-            <select
+            <Label htmlFor="cause">Cause summary (Telegram notify)</Label>
+            <Input
               id="cause"
+              type="text"
+              placeholder="Short label for the Telegram ping (not the on-chain memo line)"
               value={cause}
               onChange={(e) => setCause(e.target.value)}
-              className="flex h-10 w-full rounded-lg border border-input bg-secondary/40 px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-            >
-              {CAUSES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+              required
+            />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="grievance">Your grievance (goes in the memo as plain text)</Label>
+            <Label htmlFor="grievance">Your grievance (on-chain memo as Cause: …)</Label>
             <textarea
               id="grievance"
               className={textareaClass}
@@ -285,9 +250,8 @@ export function GrievanceForm({ onSubmitted }) {
               required
             />
             <p className="text-xs text-muted-foreground">
-              Cause, amount, addresses, and this text are written into one UTF-8 memo field (
-              <code className="text-[11px]">text/plain</code>). Very long text may be truncated to fit
-              ledger limits.
+              The memo is one line: Petty Ledger — Cause (this text) — amount — from/to. UTF-8{" "}
+              <code className="text-[11px]">text/plain</code>. Very long text may be truncated.
             </p>
           </div>
 

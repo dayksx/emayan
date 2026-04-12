@@ -1,16 +1,17 @@
 "use client";
 
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { WalletProvider } from "../components/providers/WalletProvider";
-
-const inter = Inter({ subsets: ["latin"], display: "swap" });
+import { WalletBootstrap } from "../components/WalletBootstrap";
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} min-h-screen`}>
-        <WalletProvider>{children}</WalletProvider>
+    <html lang="en">
+      <body className="min-h-screen bg-background font-body text-foreground antialiased">
+        <WalletProvider>
+          <WalletBootstrap />
+          {children}
+        </WalletProvider>
       </body>
     </html>
   );

@@ -294,6 +294,26 @@ After a clean start, confirm with `docker ps` (container **Up**) and `curl` to *
 
 For shared test infrastructure instead of Docker on localhost, deploy with `--network alphanet` and the same `bedrock vault deploy` pattern once your wallet is funded on that network. **Testnet** (`wss://s.altnet.rippletest.net`) is not listed as supported for vault deploy in this project’s `bedrock.toml` comment—use **local** or **alphanet** for vault deployment.
 
+Example:
+
+```bash
+cd contracts/petty-ledger
+bedrock vault deploy --network alphanet --wallet <funded-seed-or-jade-wallet-name>
+```
+
+**`Faucet request failed: 500` during `vault deploy`**
+
+Vault deploy may call the **alphanet faucet** (`[networks.alphanet].faucet_url` in `bedrock.toml`) to fund the deployer. A **500** response means the **faucet server** failed (overload, outage, or bug)—not your WASM. Your build step (**`✓ Built: ... petty_ledger.wasm`**) can still be fine.
+
+What to do:
+
+1. **Retry later** — often transient.
+2. **Fund the wallet yourself**, then deploy with an explicit **`--wallet`** so the flow does not depend on the faucet inside `vault deploy`:
+   - Create or import a wallet (`bedrock jade new …` / `bedrock jade import …` if your CLI supports it).
+   - When the public faucet works, run **`bedrock faucet --network alphanet --wallet <seed>`** (or use the faucet URL in a browser / curl per Nerdnest docs).
+   - Deploy: **`bedrock vault deploy --network alphanet --wallet <same-seed>`**.
+3. **Skip rebuild** if you already have WASM: **`--skip-build`**.
+
 ---
 
 ## Repository layout

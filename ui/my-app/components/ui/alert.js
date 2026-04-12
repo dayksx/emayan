@@ -3,17 +3,17 @@ import { cva } from "class-variance-authority";
 import { cn } from "../../lib/utils";
 
 const alertVariants = cva(
-  "relative w-full rounded-lg border px-4 py-3 text-sm [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground [&>svg~*]:pl-7",
+  "relative w-full rounded-sm border px-4 py-3 text-sm [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground [&>svg~*]:pl-7",
   {
     variants: {
       variant: {
         default: "bg-background text-foreground",
         destructive:
-          "border-destructive/40 bg-destructive/10 text-red-200 [&>svg]:text-red-400",
+          "border-destructive/40 bg-destructive/10 text-foreground [&>svg]:text-destructive",
         success:
-          "border-emerald-500/30 bg-emerald-500/10 text-emerald-100 [&>svg]:text-emerald-400",
+          "border-primary/30 bg-primary/10 text-foreground [&>svg]:text-primary",
         warning:
-          "border-amber-500/30 bg-amber-500/10 text-amber-100 [&>svg]:text-amber-400",
+          "border-muted-foreground/30 bg-muted text-muted-foreground [&>svg]:text-muted-foreground",
       },
     },
     defaultVariants: {
