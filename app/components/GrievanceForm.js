@@ -61,10 +61,6 @@ export function GrievanceForm({ onSubmitted }) {
     }
 
     const tg = telegramHandle.trim();
-    if (!tg) {
-      showStatus("Enter the culprit’s Telegram @username or chat ID for notification", "error");
-      return;
-    }
 
     const memoPlainText = buildGrievanceMemoText({
       filer: partyA,
@@ -123,8 +119,11 @@ export function GrievanceForm({ onSubmitted }) {
           telegramError = `notify returned invalid JSON (HTTP ${notifyRes.status})`;
         }
         if (telegramStatus !== "failed") {
-          if (notifyJson.skipped && notifyJson.reason === "telegram_bot_token_not_set") {
-            telegramStatus = "not_configured";
+          if (notifyJson.skipped) {
+            telegramStatus =
+              notifyJson.reason === "telegram_bot_token_not_set"
+                ? "not_configured"
+                : "skipped";
           } else if (notifyJson.ok) {
             telegramStatus = "sent";
             if (
@@ -259,7 +258,7 @@ export function GrievanceForm({ onSubmitted }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="telegram">Culprit’s Telegram (notify)</Label>
+            <Label htmlFor="telegram">Accused’s Telegram (optional · notify)</Label>
             <Input
               id="telegram"
               type="text"

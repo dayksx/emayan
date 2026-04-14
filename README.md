@@ -1,4 +1,4 @@
-# 😤 Petty Ledger — *Technical README*
+# ✨😊 Petty Ledger — *Technical README*
 
 **Hackathon context:** Emayan / Petty Ledger — Grievance ledger (April 2026).
 

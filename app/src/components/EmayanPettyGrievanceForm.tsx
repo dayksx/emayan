@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { convertStringToHex, isValidClassicAddress, xrpToDrops } from "xrpl";
+import { convertStringToHex, xrpToDrops } from "xrpl";
 import { useWallet } from "../../components/providers/WalletProvider";
 import {
   CORRECTION_WINDOW_POLICY_LABEL,
@@ -11,19 +11,27 @@ import {
 import { buildGrievanceTelegramText } from "../../lib/telegram-grievance-text";
 import { txExplorerUrl } from "../../lib/xrpl-explorer";
 
-/** Visual-only options from the Petty Ledger mock UI (not written on-chain). */
-const MOCK_DONATION_CAUSES = [
+/** Petty Ledger escrow wallet — all grievance payments are sent here. */
+const PETTY_LEDGER_ESCROW_ADDRESS = "r9ogmjMT1XHQivnX5UzqzxohBagKPDJHrP";
+
+/** On-chain payment amount presets (XRP string for `xrpToDrops`). */
+const DONATION_XRP_OPTIONS = [
+  { xrp: "0.5" as const, label: "0.5 XRP", tooltip: "A PITTANCE" },
+  { xrp: "1" as const, label: "1 XRP", tooltip: "POINTED" },
+  { xrp: "2" as const, label: "2 XRP", tooltip: "VINDICTIVE" },
+];
+
+type DonationXrpChoice = (typeof DONATION_XRP_OPTIONS)[number]["xrp"] | "";
+
+/** Symbolic donation causes — shapes filing path when an accused is named. */
+const DONATION_CAUSES = [
+  { id: "maga-inc", emoji: "🇺🇸", name: "Make America Great Again Inc." },
+  { id: "clinton-foundation", emoji: "🏛️", name: "Clinton Foundation" },
   { id: "flat-earth", emoji: "🌍", name: "The Flat Earth Society" },
   { id: "man-utd", emoji: "⚽", name: "Manchester United Foundation" },
   { id: "real-madrid-foundation", emoji: "👑", name: "Real Madrid Foundation" },
   { id: "nickelback", emoji: "🎸", name: "Nickelback" },
   { id: "pigeon", emoji: "🐦", name: "Penny's Pigeon Aid" },
-];
-
-const MOCK_AMOUNTS = [
-  { value: "0.50 RLUSD", label: "a pittance" },
-  { value: "1.00 RLUSD", label: "pointed" },
-  { value: "2.00 RLUSD", label: "aggressive" },
 ];
 
 type Props = {
@@ -55,27 +63,24 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
 
   const [grievance, setGrievance] = useState("");
   const [accused, setAccused] = useState("");
-  const [destination, setDestination] = useState("");
-  const [amountXrp, setAmountXrp] = useState("");
+  const [donationXrp, setDonationXrp] = useState<DonationXrpChoice>("");
   const [telegramHandle, setTelegramHandle] = useState("");
   const [confirmStage, setConfirmStage] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [submitResult, setSubmitResult] = useState<SubmitResult>(null);
+  const [anonymous, setAnonymous] = useState(false);
 
-  /** Mock-only state (UI preview; escrow / RLUSD not wired). */
-  const [mockCauseId, setMockCauseId] = useState("");
-  const [mockAmount, setMockAmount] = useState("0.50 RLUSD");
+  const [causeId, setCauseId] = useState("");
   const [timing, setTiming] = useState<"" | "immediate" | "deadline">("");
   const [deadline, setDeadline] = useState("");
   const [filerTelegram, setFilerTelegram] = useState("");
-  const [anonymous, setAnonymous] = useState(false);
 
   const hasAccused = accused.trim().length > 0;
   const autoAnonymous = !hasAccused;
 
   const filingType = (() => {
     if (!hasAccused) return 1;
-    if (!mockCauseId) return 2;
+    if (!causeId) return 2;
     if (timing === "immediate") return 3;
     if (timing === "deadline") return 4;
     return 2;
@@ -112,14 +117,10 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
     }
 
     const partyA = manager.account.address.trim();
-    const dest = destination.trim();
+    const dest = PETTY_LEDGER_ESCROW_ADDRESS;
 
-    if (!isValidClassicAddress(dest)) {
-      fail("Enter a valid XRPL address for the recipient (on-chain section).");
-      return;
-    }
     if (dest === partyA) {
-      fail("Recipient address must differ from your own.");
+      fail("Connect a wallet that is not the Petty Ledger escrow address.");
       return;
     }
     if (grievance.trim().length < 10) {
@@ -127,11 +128,17 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
       return;
     }
 
+    if (!donationXrp) {
+      fail("Choose a donation amount.");
+      return;
+    }
+    const amountXrp = donationXrp;
+
     let drops: string;
     try {
       drops = xrpToDrops(amountXrp);
     } catch {
-      fail("Enter a valid XRP amount (e.g. 1 or 0.25).");
+      fail("Invalid donation amount.");
       return;
     }
     if (BigInt(drops) < 1n) {
@@ -140,16 +147,12 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
     }
 
     const tg = telegramHandle.trim();
-    if (!tg) {
-      fail("Enter the culprit’s Telegram @username or chat ID for notification.");
-      return;
-    }
 
     let correctionUntilIso: string | undefined;
     if (filingType === 4) {
       if (!deadline.trim()) {
         fail(
-          `Set a correction deadline when you choose "${CORRECTION_WINDOW_POLICY_LABEL}" (mock filing step).`
+          `Set a correction deadline when you choose "${CORRECTION_WINDOW_POLICY_LABEL}".`
         );
         return;
       }
@@ -217,8 +220,11 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
           telegramError = `notify returned invalid JSON (HTTP ${notifyRes.status})`;
         }
         if (telegramStatus !== "failed" && notifyJson) {
-          if (notifyJson.skipped && notifyJson.reason === "telegram_bot_token_not_set") {
-            telegramStatus = "not_configured";
+          if (notifyJson.skipped) {
+            telegramStatus =
+              notifyJson.reason === "telegram_bot_token_not_set"
+                ? "not_configured"
+                : "skipped";
           } else if (notifyJson.ok) {
             telegramStatus = "sent";
             const partial = notifyJson.partial;
@@ -275,11 +281,14 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
         /* ignore */
       }
 
-      setDestination("");
-      setAmountXrp("");
+      setDonationXrp("");
       setGrievance("");
       setTelegramHandle("");
       setAccused("");
+      setCauseId("");
+      setTiming("");
+      setDeadline("");
+      setFilerTelegram("");
       setConfirmStage(false);
       onSubmitted?.();
       router.push(`/filed?tx=${encodeURIComponent(hash)}`);
@@ -300,7 +309,6 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
       showStatus("Connect your wallet first", "error");
       return;
     }
-    /** Filing type 1: no optional mock flow — submit memo payment on first click ("Enter into the permanent record"). */
     if (filingType === 1) {
       await runOnchainSubmit();
       return;
@@ -328,112 +336,135 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6" id="file" noValidate>
-      <div>
-        <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
-          1. State your grievance
-        </label>
-        <textarea
-          className="form-textarea-underline"
-          placeholder='For replying "sounds good" to a dinner invite, then never showing.'
-          value={grievance}
-          onChange={(e) => {
-            setGrievance(e.target.value);
-            setConfirmStage(false);
-          }}
-          required
-        />
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-8" id="file" noValidate>
+      <section className="space-y-6">
+        <div>
+          <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
+            1. State your grievance
+          </label>
+          <textarea
+            className="form-textarea-underline"
+            placeholder='For replying "sounds good" to a dinner invite, then never showing.'
+            value={grievance}
+            onChange={(e) => {
+              setGrievance(e.target.value);
+              setConfirmStage(false);
+            }}
+            required
+          />
+        </div>
 
-      <div>
-        <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
-          2. The accused <span className="text-muted-extra">(optional)</span>
-        </label>
-        <input
-          type="text"
-          className="form-input-underline"
-          placeholder="Lucas"
-          value={accused}
-          onChange={(e) => {
-            setAccused(e.target.value);
-            setConfirmStage(false);
-          }}
-        />
-      </div>
+        <div>
+          <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
+            2. The accused <span className="text-muted-extra">(optional)</span>
+          </label>
+          <input
+            type="text"
+            className="form-input-underline"
+            placeholder="Name or nickname"
+            value={accused}
+            onChange={(e) => {
+              setAccused(e.target.value);
+              setConfirmStage(false);
+            }}
+          />
+        </div>
 
-      <div className="rounded-sm border border-blue-border/60 bg-secondary/20 p-4 space-y-4">
-        <p className="font-mono text-[9px] uppercase tracking-widest text-primary">
-          On-chain (XRPL testnet)
+        <div>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="accent-primary mt-0.5"
+              checked={anonymous || autoAnonymous}
+              disabled={autoAnonymous}
+              onChange={(e) => setAnonymous(e.target.checked)}
+            />
+            <span className="font-body text-sm text-muted-foreground leading-relaxed">
+              {autoAnonymous
+                ? "With no accused named, this filing is anonymous."
+                : "File anonymously — the public ledger shows the grievance but not your name as filer"}
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <section className="rounded-sm border border-blue-border/60 bg-secondary/20 p-4 md:p-5 space-y-5">
+        <div>
+          <p className="font-mono text-[9px] uppercase tracking-widest text-primary mb-1">3. Payment</p>
+          <p className="font-mono text-[8px] uppercase tracking-wider text-muted-extra">XRPL testnet · Petty Ledger escrow</p>
+        </div>
+
+        <p className="font-body text-xs text-muted-foreground leading-relaxed">
+          Sent to Petty Ledger escrow:{" "}
+          <span className="font-mono text-[11px] text-foreground break-all">{PETTY_LEDGER_ESCROW_ADDRESS}</span>
         </p>
+
         <div>
-          <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
-            Recipient XRPL address
+          <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-3">
+            Donation amount
           </label>
-          <input
-            type="text"
-            className="form-input-underline font-mono text-[13px]"
-            placeholder="r… (classic address)"
-            value={destination}
-            onChange={(e) => {
-              setDestination(e.target.value);
-              setConfirmStage(false);
-            }}
-            required
-          />
+          <div className="flex flex-wrap gap-2">
+            {DONATION_XRP_OPTIONS.map((opt) => (
+              <button
+                key={opt.xrp}
+                type="button"
+                title={opt.tooltip}
+                onClick={() => {
+                  setDonationXrp(opt.xrp);
+                  setConfirmStage(false);
+                }}
+                className={`font-mono text-xs px-4 py-2 rounded-sm border transition-colors duration-150 ${
+                  donationXrp === opt.xrp
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-transparent text-foreground border-blue-border hover:border-primary"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
+
         <div>
           <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
-            Amount (XRP)
-          </label>
-          <input
-            type="text"
-            inputMode="decimal"
-            className="form-input-underline"
-            placeholder="e.g. 1"
-            value={amountXrp}
-            onChange={(e) => {
-              setAmountXrp(e.target.value);
-              setConfirmStage(false);
-            }}
-            required
-          />
-        </div>
-        <div>
-          <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
-            Culprit&apos;s Telegram (notify)
+            Accused&apos;s Telegram <span className="text-muted-extra">(optional · notify)</span>
           </label>
           <input
             type="text"
             className="form-input-underline"
-            placeholder="@username or numeric chat ID"
+            placeholder="@username or numeric chat ID — leave blank to skip DM"
             value={telegramHandle}
             onChange={(e) => {
               setTelegramHandle(e.target.value);
               setConfirmStage(false);
             }}
-            required
           />
         </div>
-      </div>
+      </section>
 
-      <div className="relative rounded-sm border border-dashed border-border/80 p-4 opacity-75">
-        <p className="font-mono text-[8px] uppercase tracking-widest text-muted-extra mb-3">
-          Mock UI — donation / escrow (not connected yet)
-        </p>
+      <section className="rounded-sm border border-blue-border/40 bg-secondary/10 p-4 md:p-5 space-y-4">
+        <div>
+          <p className="font-mono text-[9px] uppercase tracking-widest text-primary mb-1">4. In their honor</p>
+          <p className="font-body text-xs text-muted-foreground leading-relaxed">
+            Choose a symbolic cause. If you named someone above, this sets how your filing proceeds
+            (notify now, or correction window before the record locks).
+          </p>
+        </div>
+
         <div>
           <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
-            In their honor, donate to <span className="text-muted-extra">(preview only)</span>
+            Donate to
           </label>
           <select
             className="form-input-underline font-body cursor-pointer"
-            value={mockCauseId}
+            value={causeId}
             onChange={(e) => {
-              setMockCauseId(e.target.value);
+              setCauseId(e.target.value);
               setConfirmStage(false);
             }}
           >
-            <option value="">— pick a charity (mock) —</option>
-            {MOCK_DONATION_CAUSES.map((c) => (
+            <option value="">— pick a cause —</option>
+            {DONATION_CAUSES.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.emoji} {c.name}
               </option>
@@ -441,35 +472,11 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
           </select>
         </div>
 
-        {mockCauseId && (
-          <div className="space-y-4 mt-4 animate-fade-in-down">
+        {causeId && (
+          <div className="space-y-4 pt-1 animate-fade-in-down">
             <div>
               <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-3">
-                Donation amount (mock)
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {MOCK_AMOUNTS.map((a) => (
-                  <button
-                    key={a.value}
-                    type="button"
-                    onClick={() => {
-                      setMockAmount(a.value);
-                      setConfirmStage(false);
-                    }}
-                    className={`font-mono text-xs px-4 py-2 rounded-sm border transition-colors duration-150 ${
-                      mockAmount === a.value
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-transparent text-foreground border-blue-border hover:border-primary"
-                    }`}
-                  >
-                    {a.value}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-3">
-                How would you like to proceed? (mock)
+                How would you like to proceed?
               </label>
               <div className="space-y-2">
                 <label className="flex items-center gap-3 cursor-pointer font-body text-sm text-foreground">
@@ -483,7 +490,7 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
                       setConfirmStage(false);
                     }}
                   />
-                  Give them a chance to correct it
+                  {CORRECTION_WINDOW_POLICY_LABEL}
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer font-body text-sm text-foreground">
                   <input
@@ -504,7 +511,7 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
               <div className="space-y-4 animate-fade-in-down">
                 <div>
                   <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
-                    Deadline for correction (stored in payment memo)
+                    Deadline for correction <span className="text-muted-extra">(stored in payment memo)</span>
                   </label>
                   <input
                     type="datetime-local"
@@ -515,7 +522,7 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
                 </div>
                 <div>
                   <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
-                    Your Telegram handle (mock)
+                    Your Telegram handle
                   </label>
                   <input
                     type="text"
@@ -529,28 +536,11 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
             )}
           </div>
         )}
-      </div>
-
-      <div className="pt-2">
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            className="accent-primary mt-0.5"
-            checked={anonymous || autoAnonymous}
-            disabled={autoAnonymous}
-            onChange={(e) => setAnonymous(e.target.checked)}
-          />
-          <span className="font-body text-sm text-muted-foreground leading-relaxed">
-            {autoAnonymous
-              ? "No recipient entered — this grievance will be filed anonymously."
-              : "File anonymously — your grievance feeds the public ledger but your name is withheld"}
-          </span>
-        </label>
-      </div>
+      </section>
 
       <button
         type="submit"
-        disabled={!grievance.trim() || isLoading}
+        disabled={!grievance.trim() || !donationXrp || isLoading}
         className={`w-full font-mono text-sm py-3.5 rounded-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
           confirmStage
             ? "bg-foreground text-background hover:opacity-90"

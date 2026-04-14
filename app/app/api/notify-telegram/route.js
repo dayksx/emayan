@@ -104,9 +104,6 @@ export async function POST(request) {
 
     const raw =
       typeof chatIdOrUsername === "string" ? chatIdOrUsername.trim() : "";
-    if (!raw) {
-      return NextResponse.json({ ok: false, error: "missing_chat" }, { status: 400 });
-    }
 
     const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
     if (!token) {
@@ -117,14 +114,28 @@ export async function POST(request) {
       });
     }
 
-    const primary = normalizeChatId(raw);
+    const primary = raw ? normalizeChatId(raw) : "";
     const extraRaw = process.env.TELEGRAM_NOTIFY_CHAT_ID?.trim();
     const extra = extraRaw ? normalizeChatId(extraRaw) : "";
 
+    /** Accused chat is optional: if empty, only notify TELEGRAM_NOTIFY_CHAT_ID when set. */
     /** @type {{ chat_id: string }[]} */
-    const targets = [{ chat_id: primary }];
-    if (extra && extra !== primary) {
+    const targets = [];
+    if (primary) {
+      targets.push({ chat_id: primary });
+      if (extra && extra !== primary) {
+        targets.push({ chat_id: extra });
+      }
+    } else if (extra) {
       targets.push({ chat_id: extra });
+    }
+
+    if (targets.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: "no_telegram_recipient",
+      });
     }
 
     const results = await Promise.all(
