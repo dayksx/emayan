@@ -44,12 +44,12 @@ There is **no standalone backend service** (no Postgres, no cron worker, no `/ap
 
 | Piece | Role |
 |------|------|
-| **[`ui/my-app/`](ui/my-app/)** | **Next.js** UI: wallet connection (**xrpl-connect** + browser wallets), **client-signed** `Payment` transactions with **plain-text memos**, confirmation page (`/filed`), ledger-style pages with **seeded** demo feed data. |
-| **[`ui/my-app/app/api/notify-telegram/`](ui/my-app/app/api/notify-telegram/route.js)** | **Optional** route: forwards notification text to the **Telegram Bot HTTP API** (`sendMessage`). Used so the browser never holds `TELEGRAM_BOT_TOKEN`. Not a general REST API for XRPL. |
+| **[`ui/`](ui/)** | **Next.js** UI: wallet connection (**xrpl-connect** + browser wallets), **client-signed** `Payment` transactions with **plain-text memos**, confirmation page (`/filed`), ledger-style pages with **seeded** demo feed data. |
+| **[`ui/app/api/notify-telegram/`](ui/app/api/notify-telegram/route.js)** | **Optional** route: forwards notification text to the **Telegram Bot HTTP API** (`sendMessage`). Used so the browser never holds `TELEGRAM_BOT_TOKEN`. Not a general REST API for XRPL. |
 | **[`contracts/petty-ledger/`](contracts/petty-ledger/)** | **`petty_ledger`** WASM (**Rust** → Bedrock smart **vault**): deposit with structured memo, hold XRP, **subject-only** withdrawals to filer, subject, or donation account. See **[`contracts/petty-ledger/README.md`](contracts/petty-ledger/README.md)** for memo layout and build/deploy. |
 | **[`ai/`](ai/)** | Optional **Telegram AI agent** (OpenAI + LangGraph) that answers questions using this README as context. Separate process from the web app. |
 
-**On-chain filing in the UI today** is a standard **`Payment`** to a **classic address** you choose (e.g. counterparty or treasury), with memo type **`Emayan`** and **`text/plain`** payload built by [`ui/my-app/lib/grievance-memo.js`](ui/my-app/lib/grievance-memo.js). That path is **not** the same memo format as the **`petty_ledger`** vault (`PETTY_LEDGER_V1` + `subject:` / `donation:` hex lines) — wiring the UI to the vault is an integration step when you deploy the contract.
+**On-chain filing in the UI today** is a standard **`Payment`** to a **classic address** you choose (e.g. counterparty or treasury), with memo type **`Emayan`** and **`text/plain`** payload built by [`ui/lib/grievance-memo.js`](ui/lib/grievance-memo.js). That path is **not** the same memo format as the **`petty_ledger`** vault (`PETTY_LEDGER_V1` + `subject:` / `donation:` hex lines) — wiring the UI to the vault is an integration step when you deploy the contract.
 
 ---
 
@@ -63,11 +63,11 @@ There is **no standalone backend service** (no Postgres, no cron worker, no `/ap
 
 | Path | Role |
 |------|------|
-| [`ui/my-app/src/components/EmayanPettyGrievanceForm.tsx`](ui/my-app/src/components/EmayanPettyGrievanceForm.tsx) | Primary filing form: memo text, optional **correction deadline** in memo (Type 4 UX), Telegram notify. |
-| [`ui/my-app/components/GrievanceForm.js`](ui/my-app/components/GrievanceForm.js) | Simpler alternate form (same memo + notify pattern). |
-| [`ui/my-app/lib/grievance-memo.js`](ui/my-app/lib/grievance-memo.js) | Memo line format, parsing, resolution memo helpers. |
-| [`ui/my-app/hooks/useWalletManager.js`](ui/my-app/hooks/useWalletManager.js) | **xrpl-connect** `WalletManager` (testnet), adapters (Xaman, WalletConnect, Crossmark, Gem, Otsu). |
-| [`ui/my-app/src/lib/seedGrievances.ts`](ui/my-app/src/lib/seedGrievances.ts) | Demo feed entries for **`LiveFeed`** / **`LedgerFeed`** (not a live chain subscription). |
+| [`ui/src/components/EmayanPettyGrievanceForm.tsx`](ui/src/components/EmayanPettyGrievanceForm.tsx) | Primary filing form: memo text, optional **correction deadline** in memo (Type 4 UX), Telegram notify. |
+| [`ui/components/GrievanceForm.js`](ui/components/GrievanceForm.js) | Simpler alternate form (same memo + notify pattern). |
+| [`ui/lib/grievance-memo.js`](ui/lib/grievance-memo.js) | Memo line format, parsing, resolution memo helpers. |
+| [`ui/hooks/useWalletManager.js`](ui/hooks/useWalletManager.js) | **xrpl-connect** `WalletManager` (testnet), adapters (Xaman, WalletConnect, Crossmark, Gem, Otsu). |
+| [`ui/src/lib/seedGrievances.ts`](ui/src/lib/seedGrievances.ts) | Demo feed entries for **`LiveFeed`** / **`LedgerFeed`** (not a live chain subscription). |
 
 ---
 
@@ -90,7 +90,7 @@ For **stake custody rules** (who may release XRP and to which addresses), see **
 
 ### 1. Memo text (explorer-friendly one-liner)
 
-From [`ui/my-app/lib/grievance-memo.js`](ui/my-app/lib/grievance-memo.js):
+From [`ui/lib/grievance-memo.js`](ui/lib/grievance-memo.js):
 
 ```javascript
 export function buildGrievanceMemoText({ filer, to, amountXrp, grievanceBody, correctionUntilIso }) {
@@ -107,7 +107,7 @@ Resolution follow-up memos use the `Petty Ledger - RESOLVED - Cancels tx: …` s
 
 ### 2. Client-signed `Payment` + memo
 
-From [`ui/my-app/src/components/EmayanPettyGrievanceForm.tsx`](ui/my-app/src/components/EmayanPettyGrievanceForm.tsx) (same pattern as `GrievanceForm.js`):
+From [`ui/src/components/EmayanPettyGrievanceForm.tsx`](ui/src/components/EmayanPettyGrievanceForm.tsx) (same pattern as `GrievanceForm.js`):
 
 ```typescript
 const transaction = {
@@ -129,11 +129,11 @@ const transaction = {
 const txResult = await manager.signAndSubmit(transaction);
 ```
 
-After submission, the form **`fetch`es** `POST /api/notify-telegram` with `{ chatIdOrUsername, text }` built by [`ui/my-app/lib/telegram-grievance-text.js`](ui/my-app/lib/telegram-grievance-text.js).
+After submission, the form **`fetch`es** `POST /api/notify-telegram` with `{ chatIdOrUsername, text }` built by [`ui/lib/telegram-grievance-text.js`](ui/lib/telegram-grievance-text.js).
 
 ### 3. Wallet connection (no server-side signing for filing)
 
-From [`ui/my-app/hooks/useWalletManager.js`](ui/my-app/hooks/useWalletManager.js):
+From [`ui/hooks/useWalletManager.js`](ui/hooks/useWalletManager.js):
 
 ```javascript
 const manager = new WalletManager({
@@ -146,11 +146,11 @@ const manager = new WalletManager({
 await manager.signAndSubmit(transaction);
 ```
 
-Network constants for explorers/faucets also live in [`ui/my-app/lib/networks.js`](ui/my-app/lib/networks.js) (testnet, devnet, alphanet).
+Network constants for explorers/faucets also live in [`ui/lib/networks.js`](ui/lib/networks.js) (testnet, devnet, alphanet).
 
 ### 4. Telegram proxy route (optional)
 
-From [`ui/my-app/app/api/notify-telegram/route.js`](ui/my-app/app/api/notify-telegram/route.js): **`POST`** accepts JSON `{ chatIdOrUsername, text }`, requires **`TELEGRAM_BOT_TOKEN`**, optionally duplicates to **`TELEGRAM_NOTIFY_CHAT_ID`**. **`GET`** calls Telegram **`getMe`** for a quick token check.
+From [`ui/app/api/notify-telegram/route.js`](ui/app/api/notify-telegram/route.js): **`POST`** accepts JSON `{ chatIdOrUsername, text }`, requires **`TELEGRAM_BOT_TOKEN`**, optionally duplicates to **`TELEGRAM_NOTIFY_CHAT_ID`**. **`GET`** calls Telegram **`getMe`** for a quick token check.
 
 ### 5. Smart vault — `petty_ledger` (Rust)
 
@@ -173,13 +173,13 @@ Full protocol text and memo examples: **[`contracts/petty-ledger/README.md`](con
 
 ## “Live” feed in the UI
 
-[`ui/my-app/src/components/LiveFeed.tsx`](ui/my-app/src/components/LiveFeed.tsx) and [`LedgerFeed.tsx`](ui/my-app/src/components/ledger/LedgerFeed.tsx) render **`seedGrievances`** from [`ui/my-app/src/lib/seedGrievances.ts`](ui/my-app/src/lib/seedGrievances.ts). They are **demo content** for the hackathon UI, not a WebSocket subscription to cause wallets. A production feed could subscribe with **xrpl.js** in the client or a small indexer — that layer is **not** implemented here.
+[`ui/src/components/LiveFeed.tsx`](ui/src/components/LiveFeed.tsx) and [`LedgerFeed.tsx`](ui/src/components/ledger/LedgerFeed.tsx) render **`seedGrievances`** from [`ui/src/lib/seedGrievances.ts`](ui/src/lib/seedGrievances.ts). They are **demo content** for the hackathon UI, not a WebSocket subscription to cause wallets. A production feed could subscribe with **xrpl.js** in the client or a small indexer — that layer is **not** implemented here.
 
 ---
 
 ## Cards & confirmation copy
 
-Card-style copy and the **`/filed`** confirmation page ([`ui/my-app/src/views/FiledView.tsx`](ui/my-app/src/views/FiledView.tsx)) follow the **four-type** narrative (titles vary by `filingType`). Telegram bodies are plain text from **`buildGrievanceTelegramText`** (no certificate PNG pipeline in-repo).
+Card-style copy and the **`/filed`** confirmation page ([`ui/src/views/FiledView.tsx`](ui/src/views/FiledView.tsx)) follow the **four-type** narrative (titles vary by `filingType`). Telegram bodies are plain text from **`buildGrievanceTelegramText`** (no certificate PNG pipeline in-repo).
 
 ---
 
@@ -187,7 +187,7 @@ Card-style copy and the **`/filed`** confirmation page ([`ui/my-app/src/views/Fi
 
 | Variable | Purpose |
 |----------|---------|
-| `NEXT_PUBLIC_XAMAN_API_KEY` | Optional Xaman adapter ([`useWalletManager.js`](ui/my-app/hooks/useWalletManager.js)). |
+| `NEXT_PUBLIC_XAMAN_API_KEY` | Optional Xaman adapter ([`useWalletManager.js`](ui/hooks/useWalletManager.js)). |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Optional WalletConnect adapter. |
 | `TELEGRAM_BOT_TOKEN` | Required for `/api/notify-telegram` to send messages. |
 | `TELEGRAM_NOTIFY_CHAT_ID` | Optional second recipient for notifications. |
