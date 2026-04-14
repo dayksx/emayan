@@ -224,3 +224,17 @@
 .form-textarea-underline:focus {
   border-color: hsl(var(--primary));
 }
+
+/* Ledger page — faint ruled lines (no line-height side effects) */
+@layer utilities {
+  .bg-ledger-ruled {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 31px,
+      hsl(var(--border)) 31px,
+      hsl(var(--border)) 32px
+    );
+    background-size: 100% 32px;
+  }
+}

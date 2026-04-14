@@ -33,11 +33,11 @@ export default function Index() {
         >
           <div className="animate-ticker-vertical px-6">
             <LiveFeed />
-            <LiveFeed />
+            <LiveFeed hideHeader />
           </div>
         </div>
         <div className="relative z-10 mx-auto max-w-2xl px-6">
-          <div className="rounded-sm border border-blue-border bg-card/95 p-6 shadow-sm backdrop-blur-sm md:p-8">
+          <div className="rounded-sm border border-blue-border bg-background p-6 shadow-sm md:p-8">
             <EmayanPettyGrievanceForm onSubmitted={() => setTxListRefresh((n) => n + 1)} />
           </div>
         </div>

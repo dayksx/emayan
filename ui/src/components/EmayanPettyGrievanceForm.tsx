@@ -10,6 +10,13 @@ import {
 } from "../../lib/grievance-memo";
 import { buildGrievanceTelegramText } from "../../lib/telegram-grievance-text";
 import { txExplorerUrl } from "../../lib/xrpl-explorer";
+import {
+  REVENGE_DONATION_CAUSES,
+  REVENGE_DONATION_SECTION_INTRO,
+  getRevengeDonationCauseLabel,
+  getRevengeDonationCauseQuip,
+  type RevengeDonationCause,
+} from "@/lib/revenge-donation-causes";
 
 /** Petty Ledger escrow wallet — all grievance payments are sent here. */
 const PETTY_LEDGER_ESCROW_ADDRESS = "r9ogmjMT1XHQivnX5UzqzxohBagKPDJHrP";
@@ -22,17 +29,6 @@ const DONATION_XRP_OPTIONS = [
 ];
 
 type DonationXrpChoice = (typeof DONATION_XRP_OPTIONS)[number]["xrp"] | "";
-
-/** Symbolic donation causes — shapes filing path when an accused is named. */
-const DONATION_CAUSES = [
-  { id: "maga-inc", emoji: "🇺🇸", name: "Make America Great Again Inc." },
-  { id: "clinton-foundation", emoji: "🏛️", name: "Clinton Foundation" },
-  { id: "flat-earth", emoji: "🌍", name: "The Flat Earth Society" },
-  { id: "man-utd", emoji: "⚽", name: "Manchester United Foundation" },
-  { id: "real-madrid-foundation", emoji: "👑", name: "Real Madrid Foundation" },
-  { id: "nickelback", emoji: "🎸", name: "Nickelback" },
-  { id: "pigeon", emoji: "🐦", name: "Penny's Pigeon Aid" },
-];
 
 type Props = {
   onSubmitted?: () => void;
@@ -77,6 +73,9 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
 
   const hasAccused = accused.trim().length > 0;
   const autoAnonymous = !hasAccused;
+
+  const selectedCauseLabel = causeId ? getRevengeDonationCauseLabel(causeId) : undefined;
+  const selectedCauseQuip = causeId ? getRevengeDonationCauseQuip(causeId) : undefined;
 
   const filingType = (() => {
     if (!hasAccused) return 1;
@@ -164,12 +163,17 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
       correctionUntilIso = d.toISOString();
     }
 
+    const associationLabel = causeId.trim()
+      ? getRevengeDonationCauseLabel(causeId.trim())
+      : undefined;
+
     const memoPlainText = buildGrievanceMemoText({
       filer: partyA,
       to: dest,
       amountXrp,
       grievanceBody: grievance,
       correctionUntilIso,
+      ...(associationLabel ? { associationLabel } : {}),
     });
 
     setIsLoading(true);
@@ -404,24 +408,35 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
             Donation amount
           </label>
           <div className="flex flex-wrap gap-2">
-            {DONATION_XRP_OPTIONS.map((opt) => (
-              <button
-                key={opt.xrp}
-                type="button"
-                title={opt.tooltip}
-                onClick={() => {
-                  setDonationXrp(opt.xrp);
-                  setConfirmStage(false);
-                }}
-                className={`font-mono text-xs px-4 py-2 rounded-sm border transition-colors duration-150 ${
-                  donationXrp === opt.xrp
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-transparent text-foreground border-blue-border hover:border-primary"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+            {DONATION_XRP_OPTIONS.map((opt) => {
+              const tipId = `donation-tier-${opt.xrp}`;
+              return (
+                <div key={opt.xrp} className="group relative inline-flex">
+                  <button
+                    type="button"
+                    aria-describedby={tipId}
+                    onClick={() => {
+                      setDonationXrp(opt.xrp);
+                      setConfirmStage(false);
+                    }}
+                    className={`font-mono text-xs px-4 py-2 rounded-sm border transition-colors duration-150 ${
+                      donationXrp === opt.xrp
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-transparent text-foreground border-blue-border hover:border-primary"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                  <span
+                    id={tipId}
+                    role="tooltip"
+                    className="pointer-events-none absolute top-[calc(100%+6px)] left-1/2 z-20 w-max max-w-[min(240px,calc(100vw-2rem))] -translate-x-1/2 translate-y-1 rounded-sm border border-blue-border/90 bg-popover/95 px-2.5 py-1.5 text-center font-mono text-[9px] uppercase tracking-widest text-primary shadow-sm backdrop-blur-sm opacity-0 transition duration-200 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+                  >
+                    {opt.tooltip}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -446,30 +461,61 @@ export default function EmayanPettyGrievanceForm({ onSubmitted }: Props) {
         <div>
           <p className="font-mono text-[9px] uppercase tracking-widest text-primary mb-1">4. In their honor</p>
           <p className="font-body text-xs text-muted-foreground leading-relaxed">
-            Choose a symbolic cause. If you named someone above, this sets how your filing proceeds
-            (notify now, or correction window before the record locks).
+            {REVENGE_DONATION_SECTION_INTRO}. Tap one; with an accused named, this also sets notification
+            timing in the next step.
           </p>
         </div>
 
-        <div>
-          <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block mb-2">
+        <div className="space-y-3">
+          <label className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground block">
             Donate to
           </label>
-          <select
-            className="form-input-underline font-body cursor-pointer"
-            value={causeId}
-            onChange={(e) => {
-              setCauseId(e.target.value);
-              setConfirmStage(false);
-            }}
+
+          <div
+            role="radiogroup"
+            aria-label="Symbolic donation association"
+            className="rounded-sm border border-blue-border bg-background/60 shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
           >
-            <option value="">— pick a cause —</option>
-            {DONATION_CAUSES.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.emoji} {c.name}
-              </option>
-            ))}
-          </select>
+            <ul className="m-0 list-none divide-y divide-blue-border p-0">
+              {REVENGE_DONATION_CAUSES.map((c: RevengeDonationCause) => {
+                const selected = causeId === c.id;
+                return (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      className={`w-full text-left py-1.5 px-2.5 font-body text-xs leading-tight transition-colors duration-200 ease-out ${
+                        selected
+                          ? "bg-primary/[0.07] text-foreground shadow-[inset_2px_0_0_0_hsl(var(--primary)/0.45)]"
+                          : "text-foreground/95 hover:bg-muted/30 active:bg-muted/45"
+                      }`}
+                      onClick={() => {
+                        setCauseId(c.id);
+                        setConfirmStage(false);
+                      }}
+                    >
+                      {c.label}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          {selectedCauseLabel && (
+            <div className="rounded-sm border border-primary bg-primary px-3 py-2 text-primary-foreground shadow-sm">
+              <p className="font-mono text-[9px] uppercase tracking-widest text-primary-foreground/75 mb-1">
+                Selected
+              </p>
+              <p className="font-body text-sm font-medium leading-snug">{selectedCauseLabel}</p>
+              {selectedCauseQuip && (
+                <p className="mt-1.5 font-body text-xs italic leading-snug text-primary-foreground/85 border-t border-primary-foreground/15 pt-1.5">
+                  {selectedCauseQuip}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {causeId && (

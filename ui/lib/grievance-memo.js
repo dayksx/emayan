@@ -44,13 +44,24 @@ export function truncateUtf8Bytes(str, maxBytes) {
 
 /**
  * Single-line memo for explorers:
- * Petty Ledger - Cause: <grievance> - Amount: x XRP - From: … - To: … [ - Correction until: ISO8601 ]
+ * Petty Ledger - Cause: <grievance> - Amount: x XRP - From: … - To: … [ - Association: <symbolic donation label> ] [ - Correction until: ISO8601 ]
  * Whitespace in the grievance is collapsed to one line so " - " separators stay readable.
- * @param {{ filer: string, to: string, amountXrp: string, grievanceBody: string, correctionUntilIso?: string }} p
+ * @param {{ filer: string, to: string, amountXrp: string, grievanceBody: string, correctionUntilIso?: string, associationLabel?: string }} p
  */
-export function buildGrievanceMemoText({ filer, to, amountXrp, grievanceBody, correctionUntilIso }) {
+export function buildGrievanceMemoText({
+  filer,
+  to,
+  amountXrp,
+  grievanceBody,
+  correctionUntilIso,
+  associationLabel,
+}) {
   const causeText = grievanceBody.trim().replace(/\s+/g, " ");
   let line = `Petty Ledger - Cause: ${causeText} - Amount: ${amountXrp} XRP - From: ${filer} - To: ${to}`;
+  if (associationLabel && String(associationLabel).trim()) {
+    const assoc = String(associationLabel).trim().replace(/\s+/g, " ");
+    line += ` - Association: ${assoc}`;
+  }
   if (correctionUntilIso && String(correctionUntilIso).trim()) {
     line += ` - Correction until: ${String(correctionUntilIso).trim()}`;
   }
@@ -63,7 +74,7 @@ const TX_HASH_RE = "[A-Fa-f0-9]{64}";
 
 /**
  * Parse a Petty Ledger grievance memo line (same shape as buildGrievanceMemoText).
- * @returns {{ cause: string, amountXrp: string, from: string, to: string, correctionUntilIso: string | null } | null}
+ * @returns {{ cause: string, amountXrp: string, from: string, to: string, correctionUntilIso: string | null, association: string | null } | null}
  */
 export function parsePettyLedgerGrievanceMemo(text) {
   if (!text || typeof text !== "string") return null;
@@ -84,11 +95,12 @@ export function parsePettyLedgerGrievanceMemo(text) {
   const cause = s.slice(causePrefix.length, amountIdx);
   const tail = s.slice(amountIdx + amountSep.length);
   const re = new RegExp(
-    `^([\\d.]+) XRP - From: (${XRPL_CLASSIC_RE}) - To: (${XRPL_CLASSIC_RE})$`
+    `^([\\d.]+) XRP - From: (${XRPL_CLASSIC_RE}) - To: (${XRPL_CLASSIC_RE})(?: - Association: (.*))?$`
   );
   const m = re.exec(tail);
   if (!m) return null;
-  return { cause, amountXrp: m[1], from: m[2], to: m[3], correctionUntilIso };
+  const association = m[4] != null && String(m[4]).trim() !== "" ? String(m[4]).trim() : null;
+  return { cause, amountXrp: m[1], from: m[2], to: m[3], correctionUntilIso, association };
 }
 
 /**
